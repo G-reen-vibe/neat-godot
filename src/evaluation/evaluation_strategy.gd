@@ -31,11 +31,15 @@ func _allocate_proportional(species_list: Array, scores: Array[float], total_pop
         for s in scores:
                 total_score += s
         if total_score < 1e-9:
-                # Equal split fallback: give 1 child to the first
-                # mini(species_count, total_population) species.
-                var n := mini(species_list.size(), total_population)
+                # Equal split fallback: distribute total_population children evenly
+                # across all species, with remainder going to the first few.
+                var n := species_list.size()
+                var per := total_population / n
+                var remainder := total_population - per * n
                 for i in range(n):
-                        (species_list[i] as Species).allocated_children = 1
+                        (species_list[i] as Species).allocated_children = per
+                        if i < remainder:
+                                (species_list[i] as Species).allocated_children += 1
                 return
         var allocated: int = 0
         for i in range(species_list.size()):
