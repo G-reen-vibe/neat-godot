@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://benvviewport001"]
 
-[ext_resource type="Script" path="res://ui/components/env_viewport.gd" id="1_ev"]
+[ext_resource type="Script" uid="uid://dswhveis4lxbg" path="res://ui/components/env_viewport.gd" id="1_ev"]
 
 [node name="EnvViewport" type="SubViewportContainer"]
 anchors_preset = 15

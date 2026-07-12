@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bgraphviz001"]
 
-[ext_resource type="Script" path="res://ui/components/graph_visualizer.gd" id="1_gv"]
+[ext_resource type="Script" uid="uid://443pj1owrahs" path="res://ui/components/graph_visualizer.gd" id="1_gv"]
 
 [node name="GraphVisualizer" type="Panel"]
 custom_minimum_size = Vector2(360, 480)

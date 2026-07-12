@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bstatsview001"]
 
-[ext_resource type="Script" path="res://ui/components/training_stats_view.gd" id="1_sv"]
+[ext_resource type="Script" uid="uid://pjop4xhb2d48" path="res://ui/components/training_stats_view.gd" id="1_sv"]
 
 [node name="TrainingStatsView" type="VBoxContainer"]
 custom_minimum_size = Vector2(300, 400)

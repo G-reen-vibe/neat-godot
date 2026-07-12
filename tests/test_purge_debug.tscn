@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://btestpd0001"]
 
-[ext_resource type="Script" path="res://tests/test_purge_debug.gd" id="1_pd"]
+[ext_resource type="Script" uid="uid://clvj1fra7a5wr" path="res://tests/test_purge_debug.gd" id="1_pd"]
 
 [node name="TestPurgeDebug" type="Node"]
 script = ExtResource("1_pd")

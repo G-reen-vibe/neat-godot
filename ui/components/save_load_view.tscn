@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bsaveload001"]
 
-[ext_resource type="Script" path="res://ui/components/save_load_view.gd" id="1_sl"]
+[ext_resource type="Script" uid="uid://dvrcwwfoha23l" path="res://ui/components/save_load_view.gd" id="1_sl"]
 
 [node name="SaveLoadView" type="VBoxContainer"]
 custom_minimum_size = Vector2(340, 400)

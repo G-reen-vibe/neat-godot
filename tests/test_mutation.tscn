@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://btestmut00001"]
 
-[ext_resource type="Script" path="res://tests/test_mutation.gd" id="1_mut"]
+[ext_resource type="Script" uid="uid://kxmm6qehv7a5" path="res://tests/test_mutation.gd" id="1_mut"]
 
 [node name="TestMutation" type="Node"]
 script = ExtResource("1_mut")

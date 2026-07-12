@@ -1,6 +1,6 @@
 [gd_scene load_steps=18 format=3 uid="uid://bspider2d0001"]
 
-[ext_resource type="Script" path="res://environments/spider_2d/spider_walker_2d_environment.gd" id="1_sp2"]
+[ext_resource type="Script" uid="uid://du7ff7kpltmxq" path="res://environments/spider_2d/spider_walker_2d_environment.gd" id="1_sp2"]
 
 [sub_resource type="CircleShape2D" id="Shape_body"]
 radius = 0.4

@@ -1,6 +1,6 @@
 [gd_scene load_steps=12 format=3 uid="uid://bpong0001"]
 
-[ext_resource type="Script" path="res://environments/pong/pong_environment.gd" id="1_pong"]
+[ext_resource type="Script" uid="uid://doonfob4cipyb" path="res://environments/pong/pong_environment.gd" id="1_pong"]
 
 [sub_resource type="RectangleShape2D" id="Shape_wall_top"]
 size = Vector2(4.2, 0.1)

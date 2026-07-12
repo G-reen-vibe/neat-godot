@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://btestcartpole001"]
 
-[ext_resource type="Script" path="res://tests/test_cartpole_scene.gd" id="1_tcp"]
+[ext_resource type="Script" uid="uid://gnvb2nx6y54m" path="res://tests/test_cartpole_scene.gd" id="1_tcp"]
 
 [node name="TestCartPoleScene" type="Node"]
 script = ExtResource("1_tcp")

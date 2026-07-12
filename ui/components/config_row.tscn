@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bconfigrow001"]
 
-[ext_resource type="Script" path="res://ui/components/config_row.gd" id="1_row"]
+[ext_resource type="Script" uid="uid://do8b3bjg1j2o0" path="res://ui/components/config_row.gd" id="1_row"]
 
 [node name="ConfigRow" type="HBoxContainer"]
 offset_right = 600

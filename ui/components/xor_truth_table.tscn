@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bxortable001"]
 
-[ext_resource type="Script" path="res://ui/components/xor_truth_table.gd" id="1_xt"]
+[ext_resource type="Script" uid="uid://dp1587pvk3fl0" path="res://ui/components/xor_truth_table.gd" id="1_xt"]
 
 [node name="XorTruthTable" type="VBoxContainer"]
 layout_mode = 3

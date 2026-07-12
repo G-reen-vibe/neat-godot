@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://benvselect001"]
 
-[ext_resource type="Script" path="res://ui/screens/env_select_screen.gd" id="1_es"]
+[ext_resource type="Script" uid="uid://ba7vdir2rf50n" path="res://ui/screens/env_select_screen.gd" id="1_es"]
 
 [node name="EnvSelectScreen" type="MarginContainer"]
 layout_mode = 3

@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://bcartpole0001"]
 
-[ext_resource type="Script" path="res://environments/cartpole/cartpole_environment.gd" id="1_cart"]
+[ext_resource type="Script" uid="uid://ce4pheryfyosx" path="res://environments/cartpole/cartpole_environment.gd" id="1_cart"]
 
 [sub_resource type="RectangleShape2D" id="Shape_cart"]
 size = Vector2(0.4, 0.2)

@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bconfigscreen001"]
 
-[ext_resource type="Script" path="res://ui/screens/config_screen.gd" id="1_cs"]
+[ext_resource type="Script" uid="uid://bapnkxqyx3tmw" path="res://ui/screens/config_screen.gd" id="1_cs"]
 
 [node name="ConfigScreen" type="MarginContainer"]
 layout_mode = 3

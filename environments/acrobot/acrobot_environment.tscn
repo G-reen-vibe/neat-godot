@@ -1,6 +1,6 @@
 [gd_scene load_steps=8 format=3 uid="uid://bacrobot0001"]
 
-[ext_resource type="Script" path="res://environments/acrobot/acrobot_environment.gd" id="1_acro"]
+[ext_resource type="Script" uid="uid://cskhy8l1gtmt" path="res://environments/acrobot/acrobot_environment.gd" id="1_acro"]
 
 [sub_resource type="CapsuleShape2D" id="Shape_link1"]
 radius = 0.05
