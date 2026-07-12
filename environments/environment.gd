@@ -1,7 +1,12 @@
-## Abstract base class for evaluation environments. An environment represents
-## one simulation that a single genome is run against. To evaluate a population,
-## the evaluator creates a fresh environment per genome (or resets and reuses)
-## and accumulates fitness.
+## Abstract base class for **non-physics** evaluation environments.
+##
+## These envs have no real-time simulation needs and run synchronously inside
+## a threaded evaluator (see [RefCountedEvaluator]). They are RefCounted so
+## they can be created/destroyed cheaply in worker threads.
+##
+## Physics envs (CartPole, Acrobot, Pong, Spiders) subclass
+## [NeatPhysicsEnvironment] instead, which is Node-based and stepped by the
+## [SceneEvaluator] via the SceneTree's physics frame.
 ##
 ## Subclasses must implement [method reset], [method step], [method is_done],
 ## and [method current_fitness].
@@ -12,7 +17,7 @@ extends RefCounted
 func reset(rng: RandomNumberGenerator = null) -> void:
 	pass
 
-## Run one simulation step given the genome's action. Returns the new state
+## Run one simulation step given the interpreted action. Returns the new state
 ## (Dictionary of input_id -> value) for the next forward pass.
 func step(action: Dictionary) -> Dictionary:
 	return {}
@@ -35,8 +40,6 @@ func interpret_output(output: Dictionary) -> Dictionary:
 	return output
 
 ## Return a Dictionary of renderable state for visualization.
-## Subclasses should populate this with whatever data their view needs.
-## Default: empty (no visualization).
 func get_visual_state() -> Dictionary:
 	return {}
 

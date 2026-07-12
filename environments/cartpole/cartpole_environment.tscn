@@ -1,0 +1,54 @@
+[gd_scene load_steps=7 format=3 uid="uid://bcartpole0001"]
+
+[ext_resource type="Script" path="res://environments/cartpole/cartpole_environment.gd" id="1_cart"]
+
+[sub_resource type="RectangleShape2D" id="Shape_cart"]
+size = Vector2(0.4, 0.2)
+
+[sub_resource type="CapsuleShape2D" id="Shape_pole"]
+radius = 0.03
+height = 1.0
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_cart"]
+friction = 0.0
+bounce = 0.0
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_pole"]
+friction = 0.0
+bounce = 0.0
+
+[node name="CartPoleEnvironment" type="Node2D"]
+script = ExtResource("1_cart")
+
+[node name="Cart" type="RigidBody2D" parent="."]
+position = Vector2(0, 0)
+mass = 1.0
+gravity_scale = 0.0
+linear_damp = 0.0
+angular_damp = 0.0
+axis_lock_linear_y = true
+axis_lock_angular = true
+can_sleep = false
+physics_material_override = SubResource("PhysMat_cart")
+
+[node name="CartShape" type="CollisionShape2D" parent="Cart"]
+shape = SubResource("Shape_cart")
+
+[node name="Pole" type="RigidBody2D" parent="."]
+position = Vector2(0, -0.5)
+mass = 0.1
+gravity_scale = 0.1
+linear_damp = 0.0
+angular_damp = 0.0
+can_sleep = false
+physics_material_override = SubResource("PhysMat_pole")
+
+[node name="PoleShape" type="CollisionShape2D" parent="Pole"]
+shape = SubResource("Shape_pole")
+
+[node name="PolePivot" type="PinJoint2D" parent="."]
+position = Vector2(0, 0)
+node_a = NodePath("../Pole")
+node_b = NodePath("../Cart")
+softness = 0.0
+bias = 0.0
