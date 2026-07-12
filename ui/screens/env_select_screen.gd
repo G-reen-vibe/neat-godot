@@ -60,6 +60,7 @@ func _ready() -> void:
                 card.env_index = i
                 card.env_name = ENVS[i].name
                 card.env_desc = ENVS[i].desc
+                card.env_color = ENVS[i].color
                 _grid.add_child(card)
                 card.selected.connect(_on_card_selected)
 

@@ -2,32 +2,11 @@
 
 [ext_resource type="Script" uid="uid://dswhveis4lxbg" path="res://ui/components/env_viewport.gd" id="1_ev"]
 
-[node name="EnvViewport" type="SubViewportContainer"]
+[node name="EnvViewport" type="Control"]
+custom_minimum_size = Vector2(320, 240)
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-stretch = true
+clip_contents = true
 script = ExtResource("1_ev")
-
-[node name="Viewport" type="SubViewport" parent="."]
-own_world_2d = true
-own_world_3d = true
-transparent_bg = true
-size = Vector2i(640, 480)
-render_target_update_mode = 1
-
-[node name="Camera2D" type="Camera2D" parent="Viewport"]
-visible = false
-
-[node name="Camera3D" type="Camera3D" parent="Viewport"]
-visible = false
-transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 2, 3)
-
-[node name="Info" type="Label" parent="."]
-offset_left = 8
-offset_top = 8
-offset_right = 308
-offset_bottom = 68
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = ""

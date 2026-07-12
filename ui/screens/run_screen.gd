@@ -117,6 +117,10 @@ func _setup_visualization() -> void:
                 var setup_fn: Callable = _make_env_setup_fn()
                 if setup_fn.is_valid():
                         setup_fn.call(_live_env)
+                # Reset the live env with a fixed seed for consistent visualization.
+                var rng := RandomNumberGenerator.new()
+                rng.seed = 12345
+                _env_viewport.reset_env(null, rng)
 
 func _setup_evaluator() -> void:
         if _env_idx == 0:
@@ -228,9 +232,11 @@ func _process(_delta: float) -> void:
 ## Drive the live visualization env with the best genome. This is purely for
 ## display; it does NOT affect fitness (which is computed by the SceneEvaluator).
 func _drive_live_env() -> void:
-        if _live_env == null or not is_instance_valid(_live_env):
+        if _env_viewport == null or not is_instance_valid(_env_viewport):
                 return
         if _pop == null or _pop.best_genome == null:
+                return
+        if _live_env == null or not is_instance_valid(_live_env):
                 return
         if not _live_env.has_method("get_state") or not _live_env.has_method("interpret_output") or not _live_env.has_method("apply_action"):
                 return
@@ -238,7 +244,7 @@ func _drive_live_env() -> void:
         if _live_env.has_method("is_done") and _live_env.is_done():
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
-                _live_env.reset(_pop.best_genome, rng)
+                _env_viewport.reset_env(_pop.best_genome, rng)
                 return
         # Apply best genome's action.
         var state: Dictionary = _live_env.get_state()

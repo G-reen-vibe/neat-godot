@@ -37,7 +37,12 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Gen: -"
 
+[node name="Graph" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+
 [node name="HistoryList" type="ItemList" parent="."]
-custom_minimum_size = Vector2(0, 200)
+custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_vertical = 3
