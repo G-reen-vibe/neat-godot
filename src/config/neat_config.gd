@@ -143,7 +143,7 @@ func build_strategies() -> Dictionary:
                 "kmedian":
                         out["speciation"] = SpeciationStrategy.KMedian.new(target_species_count, 5)
                 "purge":
-                        out["speciation"] = SpeciationStrategy.Purge.new(out["mutation_policy"])
+                        out["speciation"] = SpeciationStrategy.Purge.new(out["mutation_policy"], null, target_species_count)
                 _:
                         var std_sp := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
                         std_sp.threshold_adjustment_speed = threshold_adjustment_speed

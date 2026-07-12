@@ -385,10 +385,19 @@ func _build_config_controls() -> void:
                         var row := _make_config_row(entry)
                         _config_vbox.add_child(row)
                         if entry.has("visible_when"):
-                                # visible_when is a Dictionary of {key: value, ...} (ALL must match).
+                                # visible_when: {key: value, ...} — ALL must match (AND).
                                 _config_deps.append({
                                         "key": entry["key"],
                                         "conditions": entry["visible_when"],
+                                        "mode": "and",
+                                        "row": row,
+                                })
+                        elif entry.has("visible_when_any"):
+                                # visible_when_any: {key: [v1, v2, ...]} — key must match ANY (OR).
+                                _config_deps.append({
+                                        "key": entry["key"],
+                                        "conditions": entry["visible_when_any"],
+                                        "mode": "any",
                                         "row": row,
                                 })
         _update_config_visibility()
@@ -471,16 +480,32 @@ func _on_config_changed(_val: Variant = null) -> void:
 func _update_config_visibility() -> void:
         for dep: Dictionary in _config_deps:
                 var conditions: Dictionary = dep["conditions"]
-                var all_match: bool = true
-                for dep_key: String in conditions:
-                        var dep_value: Variant = conditions[dep_key]
-                        var current_val: Variant = _read_control_value_typed(dep_key)
-                        # Compare as strings for robustness.
-                        if str(current_val) != str(dep_value):
-                                all_match = false
-                                break
+                var mode: String = dep.get("mode", "and")
                 var row: Control = dep.get("row")
-                if row != null and is_instance_valid(row):
+                if row == null or not is_instance_valid(row):
+                        continue
+                if mode == "any":
+                        # OR: visible if any condition matches. conditions = {key: [v1, v2, ...]}
+                        var any_match: bool = false
+                        for dep_key: String in conditions:
+                                var allowed_values: Array = conditions[dep_key]
+                                var current_val: Variant = _read_control_value_typed(dep_key)
+                                for v in allowed_values:
+                                        if str(current_val) == str(v):
+                                                any_match = true
+                                                break
+                                if any_match:
+                                        break
+                        row.visible = any_match
+                else:
+                        # AND: visible if all conditions match. conditions = {key: value}
+                        var all_match: bool = true
+                        for dep_key: String in conditions:
+                                var dep_value: Variant = conditions[dep_key]
+                                var current_val: Variant = _read_control_value_typed(dep_key)
+                                if str(current_val) != str(dep_value):
+                                        all_match = false
+                                        break
                         row.visible = all_match
 
 func _read_control_value_typed(key: String) -> Variant:
@@ -640,11 +665,11 @@ func _get_config_schema() -> Array:
                  "visible_when": {"enable_prune_mutation": true}},
                 {"section": "Speciation"},
                 {"key": "speciation_method", "label": "Speciation Method", "type": "enum", "options": [
-                        ["Single (all in one)", "single"], ["Standard (dynamic threshold)", "standard"], ["Purge (start with best)", "purge"]
+                        ["Single (all in one)", "single"], ["Standard (dynamic threshold)", "standard"], ["Purge (start with best N)", "purge"]
                 ]},
-                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 1.0, "max": 15.0, "step": 0.5,
-                 "visible_when": {"speciation_method": "standard"}},
                 {"key": "target_species_count", "label": "Target Species Count", "type": "int", "min": 1, "max": 30, "step": 1,
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
+                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 1.0, "max": 15.0, "step": 0.5,
                  "visible_when": {"speciation_method": "standard"}},
                 {"key": "threshold_adjustment_speed", "label": "Threshold Adjustment Speed", "type": "float", "min": 0.05, "max": 2.0, "step": 0.05,
                  "visible_when": {"speciation_method": "standard"}},
@@ -741,15 +766,18 @@ func _build_run_screen() -> void:
         root.add_theme_constant_override("margin_top", 8)
         root.add_theme_constant_override("margin_bottom", 8)
         root.visible = false
-        # Main HBox: left (viz+stats) | right (graph viz).
-        var main_hbox := HBoxContainer.new()
-        main_hbox.add_theme_constant_override("separation", 8)
-        root.add_child(main_hbox)
-        # Left side: VBoxContainer.
+        # Main HSplitContainer: left (viz+stats) | right (tabs). Splitter lets user
+        # resize the two sides; right side has a clamped min/max width.
+        var main_split := HSplitContainer.new()
+        main_split.add_theme_constant_override("separation", 8)
+        main_split.dragger_visibility = SplitContainer.DRAGGER_VISIBLE
+        root.add_child(main_split)
+        # Left side: VBoxContainer (takes all remaining space).
         var left_vbox := VBoxContainer.new()
         left_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        left_vbox.size_flags_stretch_ratio = 1.0
         left_vbox.add_theme_constant_override("separation", 6)
-        main_hbox.add_child(left_vbox)
+        main_split.add_child(left_vbox)
         # Header bar.
         var header := HBoxContainer.new()
         header.add_theme_constant_override("separation", 8)
@@ -808,15 +836,18 @@ func _build_run_screen() -> void:
         help_bar.add_child(_solved_label)
         left_vbox.add_child(help_bar)
         # Right side: TabContainer with Genome View | Training Stats | Save/Load.
+        # Wrapped in a PanelContainer for a border; uses SIZE_FILL with a stretch
+        # ratio so it gets a fixed fraction of the width (not cut off).
         _right_tabs = TabContainer.new()
-        _right_tabs.custom_minimum_size = Vector2(360, 0)
-        _right_tabs.size_flags_horizontal = Control.SIZE_SHRINK_END
+        _right_tabs.size_flags_horizontal = Control.SIZE_FILL
+        _right_tabs.size_flags_stretch_ratio = 0.38  # ~38% of width
+        _right_tabs.custom_minimum_size = Vector2(320, 0)
         _right_tabs.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.08, 0.12), Color(0.2, 0.2, 0.28), 1, 4))
         # Tab 1: Genome view.
         var genome_tab := PanelContainer.new()
         genome_tab.name = "Genome"
         _visualizer = GraphVisualizer.new()
-        _visualizer.custom_minimum_size = Vector2(340, 500)
+        _visualizer.custom_minimum_size = Vector2(300, 400)
         genome_tab.add_child(_visualizer)
         _right_tabs.add_child(genome_tab)
         # Tab 2: Training stats.
@@ -831,7 +862,7 @@ func _build_run_screen() -> void:
         _save_load_view = SaveLoadView.new()
         save_tab.add_child(_save_load_view)
         _right_tabs.add_child(save_tab)
-        main_hbox.add_child(_right_tabs)
+        main_split.add_child(_right_tabs)
         _screens[ScreenState.RUNNING] = root
         add_child(root)
 
@@ -1052,67 +1083,99 @@ func _make_config(env_idx: int) -> NeatConfig:
         var c := NeatConfig.new()
         c.use_bias = true
         c.forward_mode = "topological"
-        # Use Purge speciation as the default (per user request): first generation
-        # keeps only the best genome and fills with mutated clones, then computes
-        # an ideal similarity threshold so all those genomes coexist.
+        # Speciation: Purge by default. First gen keeps top N genomes as seeds,
+        # then computes an ideal threshold so they stay as N stable species.
         c.speciation_method = "purge"
-        c.compatibility_threshold = 3.0
         c.target_species_count = 10
+        c.compatibility_threshold = 3.0
         c.threshold_adjustment_speed = 0.3
+        c.max_species_count = 20
+        # Generation: Asexual with elitism (standard NEAT).
         c.generation_method = "asexual"
         c.elite_count = 1
+        c.interspecies_rate = 0.001
         c.selection_method = "roulette"
         c.evaluation_method = "equal"
+        # Weight mutation: single mode, 80% chance, uniform delta ±0.5 (NEAT paper).
         c.enable_weight_mutation = true
         c.weight_mutation_mode = "single"
         c.weight_mutation_rate = 0.8
         c.weight_mutation_min = 1
+        c.weight_mutation_delta_min = -0.5
+        c.weight_mutation_delta_max = 0.5
+        c.weight_mutator_method = "standard"
+        c.weight_selector_method = "standard"
+        # Structural mutation: NEAT paper rates (low to avoid topological explosion).
         c.enable_connection_mutation = true
-        c.connection_mutation_rate = 0.3
+        c.connection_mutation_rate = 0.05
         c.connection_mutation_min = 0
+        c.connection_weight_min = -1.0
+        c.connection_weight_max = 1.0
+        c.connection_mutator_method = "standard"
+        c.connection_selector_method = "standard"
         c.enable_neuron_mutation = true
-        c.neuron_mutation_rate = 0.2
+        c.neuron_mutation_rate = 0.03
         c.neuron_mutation_min = 0
+        c.neuron_selector_method = "standard"
         c.enable_enable_mutation = true
-        c.enable_mutation_rate = 0.3
+        c.enable_mutation_rate = 0.05
         c.enable_mutation_min = 0
         c.enable_prune_mutation = false
-        c.forbid_loops = true
+        # Similarity: NEAT paper coefficients.
         c.similarity_method = "standard"
         c.similarity_c1 = 1.0
         c.similarity_c2 = 1.0
         c.similarity_c3 = 0.4
+        c.similarity_n_threshold = 20
+        c.forbid_loops = true
+        # Crossover defaults (used if generation_method changes).
+        c.overall_crossover_method = "fitter"
+        c.neuron_crossover_method = "standard"
+        c.biased_average_strength = 0.5
+        c.crossover_rate = 0.5
         match env_idx:
                 0:
+                        # XOR: small population, sigmoid output, low threshold.
                         c.num_inputs = 2
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.SIGMOID
                         c.population_size = 150
+                        c.target_species_count = 10
                 1:
+                        # CartPole: tanh output, moderate population.
                         c.num_inputs = 4
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 100
+                        c.target_species_count = 8
                 2:
+                        # Acrobot: tanh output, moderate population.
                         c.num_inputs = 6
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 100
+                        c.target_species_count = 8
                 3:
+                        # Pong: tanh output, smaller pop (tournament is expensive).
                         c.num_inputs = 6
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 80
+                        c.target_species_count = 8
                 4:
+                        # Spider 2D: tanh output, 8 outputs (leg controls).
                         c.num_inputs = 12
                         c.num_outputs = 8
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 80
+                        c.target_species_count = 8
                 5:
+                        # Spider 3D: tanh output, 12 outputs.
                         c.num_inputs = 16
                         c.num_outputs = 12
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 60
+                        c.target_species_count = 6
         return c
 
 func _make_extra(env_idx: int) -> Dictionary:

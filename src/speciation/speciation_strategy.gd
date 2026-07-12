@@ -53,12 +53,12 @@ class Standard:
         var threshold_adjustment_speed: float = 0.3
         # Hard cap on species count; above this, similar species are merged.
         var max_species_count: int = 20
-        # Species whose representative is within this fraction of the threshold are
-        # considered "too similar" and may be merged.
-        var merge_ratio: float = 1.0
+        # Species whose representative distance is below threshold * merge_ratio
+        # are merged. Lower = more aggressive merging.
+        var merge_ratio: float = 0.5
         # Min/max bounds for the threshold (prevents runaway).
         var min_threshold: float = 0.5
-        var max_threshold: float = 10.0
+        var max_threshold: float = 15.0
         # Internal: next species id to allocate.
         var _next_species_id: int = 0
 
@@ -119,14 +119,19 @@ class Standard:
                 # Dynamic threshold adjustment (NEAT paper):
                 # If we have more species than the target, increase δ to make speciation
                 # stricter. If fewer, decrease δ to make it more permissive.
+                # The adjustment is proportional to how far off we are, so it converges
+                # quickly rather than creeping by a fixed amount each generation.
                 var count := non_empty.size()
                 if count > target_species_count:
-                        compatibility_threshold += threshold_adjustment_speed
+                        # Adjust proportional to how far off we are (squared for faster convergence).
+                        var ratio: float = float(count) / float(maxi(1, target_species_count))
+                        compatibility_threshold += threshold_adjustment_speed * ratio * ratio
                 elif count < target_species_count:
-                        compatibility_threshold -= threshold_adjustment_speed
+                        var ratio: float = float(maxi(1, target_species_count)) / float(maxi(1, count))
+                        compatibility_threshold -= threshold_adjustment_speed * ratio * ratio
                 compatibility_threshold = clampf(compatibility_threshold, min_threshold, max_threshold)
                 # Merge if too many species (after threshold adjustment).
-                if count > max_species_count:
+                if count > target_species_count:
                         _merge_similar(non_empty, similarity)
                 return non_empty
 
@@ -259,47 +264,98 @@ class KMedian:
 
 class Purge:
         extends SpeciationStrategy
-        # First-generation behavior: keep only the best genome, fill the species
-        # with mutated copies, compute ideal similarity rate.
-        # Subsequent generations: delegate to Standard.
+        ## Purge speciation: on the first generation, keep only the top N genomes
+        ## (where N = target_species_count), then duplicate each of them to fill
+        ## the population. Each top genome becomes the representative of its own
+        ## species. Compute the ideal compatibility threshold as the minimum
+        ## pairwise distance between representatives (so each stays in its own
+        ## species). Subsequent generations delegate to Standard with that threshold.
+        ##
+        ## This produces a stable N-species starting point with good genetic
+        ## diversity (N distinct seeds) and a threshold calibrated to keep them
+        ## separate.
 
         var standard: Standard = null
         var first_generation: bool = true
         var mutation_policy: MutationPolicy = null
         var ideal_threshold: float = 3.0
+        var target_species_count: int = 10
 
-        func _init(p_mutation_policy: MutationPolicy = null, p_standard: Standard = null) -> void:
+        func _init(p_mutation_policy: MutationPolicy = null, p_standard: Standard = null, p_target: int = 10) -> void:
                 mutation_policy = p_mutation_policy
+                target_species_count = p_target
                 standard = p_standard if p_standard != null else Standard.new()
+                standard.target_species_count = p_target
 
         func speciate(genomes: Array, prev_species: Array, similarity: SimilarityTest, ctx: MutationContext) -> Array:
                 if not first_generation:
                         return standard.speciate(genomes, prev_species, similarity, ctx)
                 first_generation = false
-                # Find best genome.
-                var best: Genome = genomes[0]
-                for g: Genome in genomes:
-                        if g.fitness > best.fitness:
-                                best = g
-                # Replace every other genome with a mutated clone of the best.
-                for i in range(genomes.size()):
-                        var clone := best.duplicate()
+                # Sort genomes by fitness descending.
+                var sorted := genomes.duplicate()
+                sorted.sort_custom(func(a, b): return a.fitness > b.fitness)
+                # Pick the top N genomes as species seeds.
+                var n: int = mini(target_species_count, sorted.size())
+                var seeds: Array = sorted.slice(0, n)
+                # Apply mutations to each seed so they diverge slightly.
+                if mutation_policy != null:
+                        for i in range(seeds.size()):
+                                var clone := (seeds[i] as Genome).duplicate()
+                                mutation_policy.apply(clone, ctx)
+                                seeds[i] = clone
+                # Fill the remaining population slots with mutated clones of the seeds,
+                # round-robin. Each genome's parent_species_id is set to its seed index.
+                var population_size: int = genomes.size()
+                var new_genomes: Array = []
+                for i in range(population_size):
+                        var seed_idx: int = i % n
+                        var seed: Genome = seeds[seed_idx]
+                        var clone := seed.duplicate()
+                        clone.parent_species_id = seed_idx
                         if mutation_policy != null:
                                 mutation_policy.apply(clone, ctx)
-                        genomes[i] = clone
-                # Compute ideal similarity: the threshold needed so all genomes stay in one species.
-                # Find the max distance between any two genomes.
-                var max_d: float = 0.0
-                for i in range(genomes.size()):
-                        for j in range(i + 1, genomes.size()):
-                                var d: float = similarity.distance(genomes[i], genomes[j])
-                                if d > max_d:
-                                        max_d = d
-                ideal_threshold = max_d + 0.1
+                        new_genomes.append(clone)
+                # Replace the genomes array contents in-place (so the caller sees the
+                # new genomes).
+                genomes.clear()
+                for g in new_genomes:
+                        genomes.append(g)
+                # Compute the ideal threshold: we want a threshold that keeps the N
+                # seed species separate but allows mutated offspring to stay with their
+                # parent species. Use the average pairwise distance between seeds as
+                # the threshold — this is large enough to absorb mutation drift while
+                # keeping distinct seeds separate.
+                var total_dist: float = 0.0
+                var dist_count: int = 0
+                var max_dist: float = 0.0
+                for i in range(seeds.size()):
+                        for j in range(i + 1, seeds.size()):
+                                var d: float = similarity.distance(seeds[i], seeds[j])
+                                total_dist += d
+                                dist_count += 1
+                                if d > max_dist:
+                                        max_dist = d
+                var avg_dist: float = total_dist / float(maxi(1, dist_count))
+                if dist_count == 0:
+                        # Only one seed; use a moderate threshold.
+                        ideal_threshold = 3.0
+                else:
+                        # Threshold = avg_dist + buffer for mutation drift. Each generation,
+                        # mutations add ~0-2 new genes (distance ~1-2 each). We want the
+                        # threshold high enough to absorb several generations of drift before
+                        # a genome is kicked out. Use avg_dist + 3.0 as a reasonable buffer.
+                        ideal_threshold = avg_dist + 3.0
                 standard.compatibility_threshold = ideal_threshold
-                # Put all in one species.
-                var sp := Species.new(0)
+                # Build species: assign each genome to its seed species (already set
+                # via parent_species_id during fill).
+                var species_list: Array = []
+                for i in range(n):
+                        var sp := Species.new(i)
+                        sp.representative = (seeds[i] as Genome).duplicate()
+                        species_list.append(sp)
                 for g: Genome in genomes:
-                        sp.add_member(g)
-                sp.representative = genomes[0]
-                return [sp]
+                        var sid: int = g.parent_species_id
+                        if sid < 0 or sid >= species_list.size():
+                                sid = 0
+                        (species_list[sid] as Species).add_member(g)
+                return species_list

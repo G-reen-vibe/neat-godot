@@ -23,6 +23,8 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/size/resizable=true
+window/size/window_mode=3
+window/size/initial_mode=3
 
 [editor]
 

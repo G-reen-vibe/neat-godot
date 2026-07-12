@@ -99,7 +99,8 @@ func _test_kmedian() -> void:
         print("  kmedian: OK (%d species)" % species.size())
 
 func _test_purge() -> void:
-        # First generation: purge should keep only best and fill with mutated clones.
+        # First generation: purge should keep top N genomes as seeds, fill with
+        # mutated clones, and produce N species.
         var genomes: Array = []
         for i in range(10):
                 var g := _build_starter_genome()
@@ -108,22 +109,28 @@ func _test_purge() -> void:
         var pol := MutationPolicy.General.new(true, 1.0)
         pol.weight_selector = WeightSelector.Standard.new(1, 1.0)
         pol.weight_mutator = WeightMutator.Standard.new(-0.5, 0.5)
-        var purge := SpeciationStrategy.Purge.new(pol)
+        var purge := SpeciationStrategy.Purge.new(pol, null, 3)  # target 3 species
         var species := purge.speciate(genomes, [], similarity, ctx)
-        assert(species.size() == 1, "Purge first-gen should produce 1 species")
-        assert(species[0].members.size() == 10, "Should still have 10 genomes")
-        # All genomes should be mutated clones of the best (genome #9 with fitness=9).
-        # Their weights should differ from the best's.
+        assert(species.size() == 3, "Purge first-gen should produce 3 species (target), got %d" % species.size())
+        # Total members should still be 10.
+        var total_members: int = 0
+        for sp: Species in species:
+                total_members += sp.members.size()
+        assert(total_members == 10, "Should still have 10 genomes, got %d" % total_members)
+        # Genomes should be mutated (weights differ from originals).
         var any_mutated := false
-        for g: Genome in species[0].members:
-                for c: ConnectionGene in g.connections.values():
-                        if absf(c.weight - 0.5) > 1e-3 and absf(c.weight - (-0.5)) > 1e-3 and absf(c.weight - 0.3) > 1e-3:
-                                any_mutated = true
+        for sp: Species in species:
+                for g: Genome in sp.members:
+                        for c: ConnectionGene in g.connections.values():
+                                if absf(c.weight - 0.5) > 1e-3 and absf(c.weight - (-0.5)) > 1e-3 and absf(c.weight - 0.3) > 1e-3:
+                                        any_mutated = true
+                                        break
+                        if any_mutated:
                                 break
                 if any_mutated:
                         break
         assert(any_mutated, "Purge should mutate the cloned genomes")
-        print("  purge: OK (threshold=%.3f)" % purge.ideal_threshold)
+        print("  purge: OK (species=%d, threshold=%.3f)" % [species.size(), purge.ideal_threshold])
 
 func _build_starter_genome() -> Genome:
         var g := Genome.new()
