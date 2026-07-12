@@ -68,10 +68,11 @@ var _extra: Dictionary = {}
 var _pop: Population = null
 var _evaluator: Evaluator = null
 var _env_factory: Callable = Callable()
-var _auto_run: bool = true
+var _auto_run: bool = false  # Start paused; user presses Run to begin.
 var _solved: bool = false
 var _speed: int = 1
 var _pong_opponents: Array = []
+var _stats_tracker: TrainingStatsTracker = null
 
 # === UI: screen containers ===
 var _screens: Dictionary = {}
@@ -86,12 +87,15 @@ var _config_vbox: VBoxContainer = null
 # === UI: run screen elements ===
 var _sim_viewport: SimulationViewport = null
 var _visualizer: GraphVisualizer = null
+var _stats_view: TrainingStatsView = null
+var _save_load_view: SaveLoadView = null
 var _xor_table: XorTruthTable = null
 var _viz_container: PanelContainer = null
 var _stats_label: Label = null
 var _pause_btn: Button = null
 var _speed_btn: OptionButton = null
 var _solved_label: Label = null
+var _right_tabs: TabContainer = null
 
 # ============================================================
 # Lifecycle
@@ -381,10 +385,10 @@ func _build_config_controls() -> void:
                         var row := _make_config_row(entry)
                         _config_vbox.add_child(row)
                         if entry.has("visible_when"):
+                                # visible_when is a Dictionary of {key: value, ...} (ALL must match).
                                 _config_deps.append({
                                         "key": entry["key"],
-                                        "dep_key": entry["visible_when"].keys()[0],
-                                        "dep_value": entry["visible_when"].values()[0],
+                                        "conditions": entry["visible_when"],
                                         "row": row,
                                 })
         _update_config_visibility()
@@ -466,15 +470,33 @@ func _on_config_changed(_val: Variant = null) -> void:
 
 func _update_config_visibility() -> void:
         for dep: Dictionary in _config_deps:
-                var dep_key: String = dep["dep_key"]
-                var dep_value: String = dep["dep_value"]
-                var ctrl: Control = _config_controls.get(dep_key)
-                if ctrl == null:
-                        continue
-                var current_val: String = _read_control_value(dep_key)
+                var conditions: Dictionary = dep["conditions"]
+                var all_match: bool = true
+                for dep_key: String in conditions:
+                        var dep_value: Variant = conditions[dep_key]
+                        var current_val: Variant = _read_control_value_typed(dep_key)
+                        # Compare as strings for robustness.
+                        if str(current_val) != str(dep_value):
+                                all_match = false
+                                break
                 var row: Control = dep.get("row")
                 if row != null and is_instance_valid(row):
-                        row.visible = (current_val == dep_value)
+                        row.visible = all_match
+
+func _read_control_value_typed(key: String) -> Variant:
+        var ctrl: Control = _config_controls.get(key)
+        if ctrl == null:
+                return ""
+        if ctrl is SpinBox:
+                return (ctrl as SpinBox).value
+        if ctrl is OptionButton:
+                var opt := ctrl as OptionButton
+                if opt.selected >= 0 and opt.selected < opt.item_count:
+                        return opt.get_item_metadata(opt.selected)
+                return ""
+        if ctrl is CheckButton:
+                return (ctrl as CheckButton).button_pressed
+        return ""
 
 func _read_control_value(key: String) -> String:
         var ctrl: Control = _config_controls.get(key)
@@ -541,10 +563,12 @@ func _start_training() -> void:
         _pop.initialize()
         _pong_opponents.clear()
         _solved = false
-        _auto_run = true
+        _auto_run = false  # Start paused.
         _speed = 1
         if _speed_btn:
                 _speed_btn.selected = 0
+        if _pause_btn:
+                _pause_btn.text = "▶ Run"
         _setup_run_for_env()
         _show_screen(ScreenState.RUNNING)
         _update_run_ui()
@@ -561,28 +585,62 @@ func _get_config_schema() -> Array:
                 {"key": "_max_generations", "label": "Max Generations", "type": "int", "min": 10, "max": 2000, "step": 10},
                 {"section": "Weight Mutation"},
                 {"key": "weight_mutation_mode", "label": "Weight Mutation Mode", "type": "enum", "options": [
-                        ["Single (pick 1, full delta)", "single"], ["All (perturb all, small delta)", "all"]
+                        ["Single (pick N, full delta)", "single"], ["All (perturb all, small delta)", "all"]
                 ]},
-                {"key": "weight_mutation_rate", "label": "Weight Mutation Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                {"key": "weight_mutator_method", "label": "Weight Mutator Distribution", "type": "enum", "options": [
+                        ["Uniform (min, max)", "standard"], ["Normal (Gaussian)", "normal"]
+                ]},
+                {"key": "weight_mutation_rate", "label": "Weight Mutation Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
                  "visible_when": {"weight_mutation_mode": "single"}},
                 {"key": "weight_mutation_min", "label": "Min Connections to Mutate", "type": "int", "min": 1, "max": 10, "step": 1,
                  "visible_when": {"weight_mutation_mode": "single"}},
-                {"key": "weight_mutation_delta_min", "label": "Delta Min", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
-                 "visible_when": {"weight_mutation_mode": "single"}},
-                {"key": "weight_mutation_delta_max", "label": "Delta Max", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
-                 "visible_when": {"weight_mutation_mode": "single"}},
+                {"key": "weight_mutation_delta_min", "label": "Delta Min (Uniform)", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
+                 "visible_when": {"weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
+                {"key": "weight_mutation_delta_max", "label": "Delta Max (Uniform)", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
+                 "visible_when": {"weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
+                {"key": "weight_mutation_normal_std", "label": "Normal Std Dev", "type": "float", "min": 0.01, "max": 3.0, "step": 0.05,
+                 "visible_when": {"weight_mutator_method": "normal"}},
                 {"key": "weight_mutation_all_scale", "label": "All-Mode Scale Factor", "type": "float", "min": 0.01, "max": 1.0, "step": 0.01,
                  "visible_when": {"weight_mutation_mode": "all"}},
-                {"key": "weight_mutator_method", "label": "Weight Mutator", "type": "enum", "options": [
-                        ["Uniform (min, max)", "standard"], ["Normal (Gaussian)", "normal"]
+                {"key": "weight_selector_method", "label": "Weight Selector", "type": "enum", "options": [
+                        ["Standard (uniform)", "standard"], ["Capped (bias to bounds)", "capped"]
                 ]},
+                {"key": "weight_capped_min", "label": "Capped Min Weight", "type": "float", "min": -10.0, "max": 0.0, "step": 0.1,
+                 "visible_when": {"weight_selector_method": "capped"}},
+                {"key": "weight_capped_max", "label": "Capped Max Weight", "type": "float", "min": 0.0, "max": 10.0, "step": 0.1,
+                 "visible_when": {"weight_selector_method": "capped"}},
                 {"section": "Structural Mutation"},
-                {"key": "connection_mutation_rate", "label": "Connection Mutation Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
-                {"key": "neuron_mutation_rate", "label": "Neuron Mutation Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                {"key": "connection_mutation_rate", "label": "Connection Add Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                {"key": "connection_selector_method", "label": "Connection Selector", "type": "enum", "options": [
+                        ["Standard", "standard"], ["Least Used", "least_used"], ["Least Common", "least_common"]
+                ]},
+                {"key": "connection_mutator_method", "label": "Connection Mutator", "type": "enum", "options": [
+                        ["Uniform", "standard"], ["Normal", "normal"], ["Safe Gradient", "safe_gradient"]
+                ]},
+                {"key": "connection_weight_min", "label": "New Connection Weight Min", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
+                 "visible_when": {"connection_mutator_method": "standard"}},
+                {"key": "connection_weight_max", "label": "New Connection Weight Max", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
+                 "visible_when": {"connection_mutator_method": "standard"}},
+                {"key": "neuron_mutation_rate", "label": "Neuron Add Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                {"key": "neuron_selector_method", "label": "Neuron Selector", "type": "enum", "options": [
+                        ["Standard", "standard"], ["Least Common", "least_common"]
+                ]},
                 {"key": "enable_mutation_rate", "label": "Enable Mutation Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                {"section": "Prune Mutation"},
+                {"key": "enable_prune_mutation", "label": "Enable Prune Mutation", "type": "bool"},
+                {"key": "prune_mutation_rate", "label": "Prune Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                 "visible_when": {"enable_prune_mutation": true}},
+                {"key": "prune_selector_method", "label": "Prune Selector", "type": "enum", "options": [
+                        ["Standard", "standard"], ["Least Weight", "least_weight"]
+                ],
+                 "visible_when": {"enable_prune_mutation": true}},
+                {"key": "prune_mutator_method", "label": "Prune Mutator", "type": "enum", "options": [
+                        ["Disabled (any)", "disabled"], ["Non Essential", "non_essential"], ["Merge Pair", "merge"]
+                ],
+                 "visible_when": {"enable_prune_mutation": true}},
                 {"section": "Speciation"},
                 {"key": "speciation_method", "label": "Speciation Method", "type": "enum", "options": [
-                        ["Single", "single"], ["Standard (dynamic threshold)", "standard"], ["Purge", "purge"]
+                        ["Single (all in one)", "single"], ["Standard (dynamic threshold)", "standard"], ["Purge (start with best)", "purge"]
                 ]},
                 {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 1.0, "max": 15.0, "step": 0.5,
                  "visible_when": {"speciation_method": "standard"}},
@@ -592,12 +650,40 @@ func _get_config_schema() -> Array:
                  "visible_when": {"speciation_method": "standard"}},
                 {"key": "max_species_count", "label": "Max Species (merge above)", "type": "int", "min": 5, "max": 50, "step": 1,
                  "visible_when": {"speciation_method": "standard"}},
+                {"section": "Similarity Test"},
+                {"key": "similarity_method", "label": "Similarity Test", "type": "enum", "options": [
+                        ["Standard (NEAT paper)", "standard"], ["Percentage", "percentage"]
+                ]},
+                {"key": "similarity_c1", "label": "C1 (excess weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                 "visible_when": {"similarity_method": "standard"}},
+                {"key": "similarity_c2", "label": "C2 (disjoint weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                 "visible_when": {"similarity_method": "standard"}},
+                {"key": "similarity_c3", "label": "C3 (weight diff weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                 "visible_when": {"similarity_method": "standard"}},
                 {"section": "Generation & Evaluation"},
                 {"key": "generation_method", "label": "Generation Method", "type": "enum", "options": [
                         ["Asexual", "asexual"], ["Crossover", "crossover"], ["Mixed", "mixed"]
                 ]},
                 {"key": "crossover_rate", "label": "Crossover Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
                  "visible_when": {"generation_method": "mixed"}},
+                {"key": "overall_crossover_method", "label": "Overall Crossover Strategy", "type": "enum", "options": [
+                        ["Fitter", "fitter"], ["Bigger", "bigger"], ["Combine", "combine"], ["Excluded", "excluded"]
+                ],
+                 "visible_when": {"generation_method": "crossover"}},
+                {"key": "overall_crossover_method", "label": "Overall Crossover Strategy", "type": "enum", "options": [
+                        ["Fitter", "fitter"], ["Bigger", "bigger"], ["Combine", "combine"], ["Excluded", "excluded"]
+                ],
+                 "visible_when": {"generation_method": "mixed"}},
+                {"key": "neuron_crossover_method", "label": "Neuron Crossover", "type": "enum", "options": [
+                        ["Standard", "standard"], ["Standard All", "standard_all"], ["Average", "average"], ["Biased Average", "biased_average"]
+                ],
+                 "visible_when": {"generation_method": "crossover"}},
+                {"key": "neuron_crossover_method", "label": "Neuron Crossover", "type": "enum", "options": [
+                        ["Standard", "standard"], ["Standard All", "standard_all"], ["Average", "average"], ["Biased Average", "biased_average"]
+                ],
+                 "visible_when": {"generation_method": "mixed"}},
+                {"key": "biased_average_strength", "label": "Biased Average Strength", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                 "visible_when": {"neuron_crossover_method": "biased_average"}},
                 {"key": "selection_method", "label": "Parent Selection Method", "type": "enum", "options": [
                         ["Roulette", "roulette"], ["Inverse Roulette", "inverse_roulette"],
                         ["Gaussian", "gaussian"], ["Triangular", "triangular"], ["Uniform", "uniform"]
@@ -605,6 +691,8 @@ func _get_config_schema() -> Array:
                 {"key": "evaluation_method", "label": "Evaluation Strategy", "type": "enum", "options": [
                         ["Equal", "equal"], ["Improvement Rate", "improvement_rate"], ["Novelty", "novelty"]
                 ]},
+                {"key": "interspecies_rate", "label": "Interspecies Mating Rate", "type": "float", "min": 0.0, "max": 0.5, "step": 0.01},
+                {"section": "Forward Pass"},
                 {"key": "forward_mode", "label": "Forward Mode", "type": "enum", "options": [
                         ["Topological (no loops)", "topological"], ["Timestep (allows loops)", "timestep"]
                 ]},
@@ -719,16 +807,31 @@ func _build_run_screen() -> void:
         _solved_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         help_bar.add_child(_solved_label)
         left_vbox.add_child(help_bar)
-        # Right side: graph visualizer in a PanelContainer with fixed width.
-        var right_panel := PanelContainer.new()
-        right_panel.custom_minimum_size = Vector2(360, 0)
-        right_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.08, 0.12), Color(0.2, 0.2, 0.28), 1, 4))
-        # Don't let the right panel expand; left side takes remaining space.
-        right_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+        # Right side: TabContainer with Genome View | Training Stats | Save/Load.
+        _right_tabs = TabContainer.new()
+        _right_tabs.custom_minimum_size = Vector2(360, 0)
+        _right_tabs.size_flags_horizontal = Control.SIZE_SHRINK_END
+        _right_tabs.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.08, 0.12), Color(0.2, 0.2, 0.28), 1, 4))
+        # Tab 1: Genome view.
+        var genome_tab := PanelContainer.new()
+        genome_tab.name = "Genome"
         _visualizer = GraphVisualizer.new()
         _visualizer.custom_minimum_size = Vector2(340, 500)
-        right_panel.add_child(_visualizer)
-        main_hbox.add_child(right_panel)
+        genome_tab.add_child(_visualizer)
+        _right_tabs.add_child(genome_tab)
+        # Tab 2: Training stats.
+        var stats_tab := PanelContainer.new()
+        stats_tab.name = "Stats"
+        _stats_view = TrainingStatsView.new()
+        stats_tab.add_child(_stats_view)
+        _right_tabs.add_child(stats_tab)
+        # Tab 3: Save/Load.
+        var save_tab := PanelContainer.new()
+        save_tab.name = "Save/Load"
+        _save_load_view = SaveLoadView.new()
+        save_tab.add_child(_save_load_view)
+        _right_tabs.add_child(save_tab)
+        main_hbox.add_child(_right_tabs)
         _screens[ScreenState.RUNNING] = root
         add_child(root)
 
@@ -739,6 +842,15 @@ func _setup_run_for_env() -> void:
         _sim_viewport = null
         _xor_table = null
         _visualizer.population = _pop
+        # Initialize stats tracker.
+        _stats_tracker = TrainingStatsTracker.new()
+        _stats_tracker.record(_pop)
+        _stats_view.tracker = _stats_tracker
+        _stats_view.refresh()
+        # Wire up save/load view.
+        _save_load_view.population = _pop
+        _save_load_view.config = _config
+        _save_load_view.env_idx = _env_idx
         if ENVS[_env_idx]["has_viz"]:
                 _sim_viewport = SimulationViewport.new()
                 _sim_viewport.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -753,6 +865,10 @@ func _setup_run_for_env() -> void:
                 _xor_table.size_flags_vertical = Control.SIZE_EXPAND_FILL
                 _xor_table.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 _viz_container.add_child(_xor_table)
+        # Ensure paused state.
+        _auto_run = false
+        if _pause_btn:
+                _pause_btn.text = "▶ Run"
 
 func _toggle_pause() -> void:
         _auto_run = not _auto_run
@@ -766,7 +882,7 @@ func _restart_training() -> void:
         _pop.initialize()
         _pong_opponents.clear()
         _solved = false
-        _auto_run = true
+        _auto_run = false  # Start paused.
         _setup_run_for_env()
         _update_run_ui()
 
@@ -789,11 +905,43 @@ func _step_generation() -> void:
         if _env_idx == 3:
                 _update_pong_opponents()
         _pop.evolve()
+        # Record stats after evolution.
+        if _stats_tracker != null:
+                _stats_tracker.record(_pop)
+        # Check for pending load from Save/Load tab.
+        if _save_load_view != null and _save_load_view.has_pending_load():
+                _apply_pending_load()
         if _is_solved():
                 _solved = true
                 _auto_run = false
                 if _pause_btn:
                         _pause_btn.text = "▶ Run"
+
+func _apply_pending_load() -> void:
+        var data: Dictionary = _save_load_view.take_pending_load()
+        if data.is_empty():
+                return
+        # Load config if present.
+        if data.has("config"):
+                _config = _save_load_view._config_from_dict(data["config"])
+        # Load population.
+        if data.has("population"):
+                _pop = _save_load_view.load_population_from_dict(data["population"], _config)
+                _pong_opponents.clear()
+                _solved = false
+                _auto_run = false
+                if _pause_btn:
+                        _pause_btn.text = "▶ Run"
+                # Re-setup UI for the new population.
+                _visualizer.population = _pop
+                _save_load_view.population = _pop
+                if _sim_viewport != null:
+                        _sim_viewport.population = _pop
+                # Reset stats tracker with loaded generation as initial.
+                _stats_tracker = TrainingStatsTracker.new()
+                _stats_tracker.record(_pop)
+                _stats_view.tracker = _stats_tracker
+                _stats_view.refresh()
 
 func _step_pong_generation() -> void:
         var input_ids: Array[int] = [0, 1, 2, 3, 4, 5]
@@ -889,6 +1037,12 @@ func _update_run_ui() -> void:
                 # Pass tournament opponents for Pong live viz.
                 if _env_idx == 3:
                         _sim_viewport.opponents = _pong_opponents
+        if _stats_view != null:
+                _stats_view.refresh()
+        # Update save/load view's population reference.
+        if _save_load_view != null:
+                _save_load_view.population = _pop
+                _save_load_view.config = _config
 
 # ============================================================
 # Env setup: config, factory, evaluator
@@ -898,7 +1052,10 @@ func _make_config(env_idx: int) -> NeatConfig:
         var c := NeatConfig.new()
         c.use_bias = true
         c.forward_mode = "topological"
-        c.speciation_method = "standard"
+        # Use Purge speciation as the default (per user request): first generation
+        # keeps only the best genome and fills with mutated clones, then computes
+        # an ideal similarity threshold so all those genomes coexist.
+        c.speciation_method = "purge"
         c.compatibility_threshold = 3.0
         c.target_species_count = 10
         c.threshold_adjustment_speed = 0.3
@@ -919,7 +1076,12 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.enable_enable_mutation = true
         c.enable_mutation_rate = 0.3
         c.enable_mutation_min = 0
+        c.enable_prune_mutation = false
         c.forbid_loops = true
+        c.similarity_method = "standard"
+        c.similarity_c1 = 1.0
+        c.similarity_c2 = 1.0
+        c.similarity_c3 = 0.4
         match env_idx:
                 0:
                         c.num_inputs = 2
