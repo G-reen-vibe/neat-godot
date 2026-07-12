@@ -18,23 +18,30 @@ extends RefCounted
 func evaluate(species_list: Array, total_population: int, ctx: MutationContext) -> void:
         pass
 
-## Default child allocation: proportional to species score * species size.
+## Default child allocation: proportional to species score.
 ## Subclasses provide per-species scores via [method _score_species].
+## Species with very low scores may get 0 children (effectively culled).
 func _allocate_proportional(species_list: Array, scores: Array[float], total_population: int) -> void:
+        # Reset all to 0 first.
+        for sp: Species in species_list:
+                sp.allocated_children = 0
+        if species_list.is_empty() or total_population <= 0:
+                return
         var total_score: float = 0.0
         for s in scores:
                 total_score += s
         if total_score < 1e-9:
-                # Equal split fallback.
-                var equal := maxi(1, total_population / maxi(1, species_list.size()))
-                for sp: Species in species_list:
-                        sp.allocated_children = equal
+                # Equal split fallback: give 1 child to the first
+                # mini(species_count, total_population) species.
+                var n := mini(species_list.size(), total_population)
+                for i in range(n):
+                        (species_list[i] as Species).allocated_children = 1
                 return
         var allocated: int = 0
         for i in range(species_list.size()):
                 var sp: Species = species_list[i]
                 var share := int(round(scores[i] / total_score * float(total_population)))
-                sp.allocated_children = maxi(1, share)
+                sp.allocated_children = maxi(0, share)
                 allocated += sp.allocated_children
         # Adjust for rounding: add/subtract from the largest species.
         if allocated != total_population and not species_list.is_empty():
@@ -45,8 +52,8 @@ func _allocate_proportional(species_list: Array, scores: Array[float], total_pop
                         if (species_list[i] as Species).allocated_children > (species_list[biggest_idx] as Species).allocated_children:
                                 biggest_idx = i
                 (species_list[biggest_idx] as Species).allocated_children += diff
-                if (species_list[biggest_idx] as Species).allocated_children < 1:
-                        (species_list[biggest_idx] as Species).allocated_children = 1
+                if (species_list[biggest_idx] as Species).allocated_children < 0:
+                        (species_list[biggest_idx] as Species).allocated_children = 0
 
 ## Delete species (mark for removal) below this score threshold.
 ## Returns the updated species_list (without the deleted ones).
