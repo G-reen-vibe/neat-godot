@@ -29,42 +29,42 @@ var allocated_children: int = 0
 var mutation_rate_multiplier: float = 1.0
 
 func _init(p_id: int = -1) -> void:
-        id = p_id
+		id = p_id
 
 func add_member(g: Genome) -> void:
-        g.species_id = id
-        members.append(g)
+		g.species_id = id
+		members.append(g)
 
 func clear_members() -> void:
-        members.clear()
+		members.clear()
 
 func size() -> int:
-        return members.size()
+		return members.size()
 
 func record_generation_stats() -> void:
-        var cur_best: float = -1e9
-        var sum: float = 0.0
-        for g: Genome in members:
-                if g.fitness > cur_best:
-                        cur_best = g.fitness
-                sum += g.fitness
-        best_fitness = maxf(best_fitness, cur_best)
-        if best_fitness_history.size() == 0 or cur_best > best_fitness_history[-1] + 1e-9:
-                staleness = 0
-        else:
-                staleness += 1
-        best_fitness_history.append(cur_best)
-        average_fitness = sum / float(maxi(1, members.size()))
-        average_fitness_history.append(average_fitness)
+		var cur_best: float = -1e9
+		var sum: float = 0.0
+		for g: Genome in members:
+				if g.fitness > cur_best:
+						cur_best = g.fitness
+				sum += g.fitness
+		best_fitness = maxf(best_fitness, cur_best)
+		if best_fitness_history.size() == 0 or cur_best > best_fitness_history[-1] + 1e-9:
+				staleness = 0
+		else:
+				staleness += 1
+		best_fitness_history.append(cur_best)
+		average_fitness = sum / float(maxi(1, members.size()))
+		average_fitness_history.append(average_fitness)
 
 func increment_connection_selection(innov: int) -> void:
-        selection_counts[innov] = int(selection_counts.get(innov, 0)) + 1
+		selection_counts[innov] = int(selection_counts.get(innov, 0)) + 1
 
 func increment_node_selection(node_id: int) -> void:
-        node_selection_counts[node_id] = int(node_selection_counts.get(node_id, 0)) + 1
+		node_selection_counts[node_id] = int(node_selection_counts.get(node_id, 0)) + 1
 
 func connection_selection_count(innov: int) -> int:
-        return int(selection_counts.get(innov, 0))
+		return int(selection_counts.get(innov, 0))
 
 func node_selection_count(node_id: int) -> int:
-        return int(node_selection_counts.get(node_id, 0))
+		return int(node_selection_counts.get(node_id, 0))

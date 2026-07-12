@@ -13,7 +13,7 @@ config_version=5
 config/name="neat-godot"
 config/description="NEAT (NeuroEvolution of Augmenting Topologies) implementation in Godot 4 with multiple hyperparameter strategies and graph visualizer."
 run/main_scene="res://ui/main_app.tscn"
-config/features=PackedStringArray("4.7", "Forward Plus")
+config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [display]
