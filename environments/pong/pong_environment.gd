@@ -21,8 +21,10 @@ const PADDLE_SPEED: float = 4.0
 const BALL_SPEED: float = 4.0
 const BALL_RADIUS: float = 0.05
 const PADDLE_MARGIN: float = 0.1
-const POINTS_TO_WIN: int = 5
 const MAX_STEPS: int = 1200
+
+# Configurable: points needed to win a match.
+var points_to_win: int = 5
 
 # Network IO config.
 var input_node_ids: Array[int] = []
@@ -49,10 +51,11 @@ var _done: bool = false
 var _hits_a: int = 0  # successful returns by A
 var _hits_b: int = 0
 
-func _init(p_input_ids: Array[int] = [], p_bias_id: int = -1, p_output_id: int = -1) -> void:
+func _init(p_input_ids: Array[int] = [], p_bias_id: int = -1, p_output_id: int = -1, p_points_to_win: int = 5) -> void:
         input_node_ids = p_input_ids
         bias_node_id = p_bias_id
         output_node_id = p_output_id
+        points_to_win = p_points_to_win
 
 func set_player_a(g: Genome) -> void:
         player_a = g
@@ -150,7 +153,7 @@ func step(action: Dictionary) -> Dictionary:
                 _score_a += 1
                 _reset_ball(-1.0)
         _steps += 1
-        if _score_a >= POINTS_TO_WIN or _score_b >= POINTS_TO_WIN:
+        if _score_a >= points_to_win or _score_b >= points_to_win:
                 _done = true
         if _steps >= MAX_STEPS:
                 _done = true
@@ -179,7 +182,7 @@ func current_fitness() -> float:
         return maxf(0.0, score)
 
 func is_solved() -> bool:
-        return _score_a >= POINTS_TO_WIN and _score_a > _score_b
+        return _score_a >= points_to_win and _score_a > _score_b
 
 func view_type() -> String:
         return "2d"
@@ -203,7 +206,7 @@ func get_visual_state() -> Dictionary:
                 "paddle_width": PADDLE_WIDTH,
                 "paddle_margin": PADDLE_MARGIN,
                 "ball_radius": BALL_RADIUS,
-                "points_to_win": POINTS_TO_WIN,
+                "points_to_win": points_to_win,
                 "hits_a": _hits_a,
                 "hits_b": _hits_b,
         }
