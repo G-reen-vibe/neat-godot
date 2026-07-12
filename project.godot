@@ -36,6 +36,10 @@ warnings/unsafe_property_access=0
 warnings/unsafe_cast=0
 warnings/untyped_declaration=0
 
+[physics]
+
+2d/default_gravity=9.8
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

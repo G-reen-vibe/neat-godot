@@ -37,7 +37,7 @@ shape = SubResource("Shape_cart")
 [node name="Pole" type="RigidBody2D" parent="."]
 position = Vector2(0, -0.5)
 mass = 0.1
-gravity_scale = 0.1
+gravity_scale = 1.0
 linear_damp = 0.0
 angular_damp = 0.0
 can_sleep = false
