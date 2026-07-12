@@ -115,7 +115,10 @@ var weight_capped_max: float = 3.0
 
 var enable_connection_mutation: bool = true
 var connection_mutation_rate: float = 0.05
-var connection_mutation_min: int = 1
+# min_count = 0 means purely probabilistic (standard NEAT): each genome has a
+# `rate` chance of getting 1 connection-add mutation. Set to 1 to force at
+# least 1 mutation per genome.
+var connection_mutation_min: int = 0
 var connection_weight_min: float = -1.0
 var connection_weight_max: float = 1.0
 var connection_weight_normal_std: float = 0.5
@@ -124,18 +127,19 @@ var connection_selector_method: String = "standard"  # "standard", "least_used",
 
 var enable_neuron_mutation: bool = true
 var neuron_mutation_rate: float = 0.03
-var neuron_mutation_min: int = 1
+# min_count = 0: purely probabilistic (standard NEAT).
+var neuron_mutation_min: int = 0
 var neuron_selector_method: String = "standard"  # "standard", "least_common"
 
 var enable_prune_mutation: bool = false
 var prune_mutation_rate: float = 0.01
-var prune_mutation_min: int = 1
+var prune_mutation_min: int = 0
 var prune_selector_method: String = "standard"  # "standard", "least_weight"
 var prune_mutator_method: String = "disabled"  # "disabled", "non_essential", "merge"
 
 var enable_enable_mutation: bool = false
 var enable_mutation_rate: float = 0.01
-var enable_mutation_min: int = 1
+var enable_mutation_min: int = 0
 
 # --- Mutation policy ---
 # "general" or "phased_pruning".
