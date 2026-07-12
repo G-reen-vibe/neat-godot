@@ -1,0 +1,67 @@
+[gd_scene load_steps=4 format=3 uid="uid://benvcard001"]
+
+[ext_resource type="Script" path="res://ui/components/env_card.gd" id="1_card"]
+
+[sub_resource type="StyleBoxFlat" id="Style_normal"]
+bg_color = Color(0.1, 0.2, 0.15, 1)
+border_width_left = 2
+border_width_right = 2
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.4, 0.25, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_left = 8
+corner_radius_bottom_right = 8
+content_margin_left = 16
+content_margin_right = 16
+content_margin_top = 14
+content_margin_bottom = 14
+
+[sub_resource type="StyleBoxFlat" id="Style_hover"]
+bg_color = Color(0.15, 0.3, 0.2, 1)
+border_width_left = 3
+border_width_right = 3
+border_width_top = 3
+border_width_bottom = 3
+border_color = Color(0.3, 0.8, 0.4, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_left = 8
+corner_radius_bottom_right = 8
+
+[node name="EnvCard" type="Button"]
+custom_minimum_size = Vector2(280, 150)
+offset_right = 280
+offset_bottom = 150
+text = ""
+add_theme_stylebox_override("normal", SubResource("Style_normal"))
+add_theme_stylebox_override("hover", SubResource("Style_hover"))
+add_theme_stylebox_override("pressed", SubResource("Style_normal"))
+script = ExtResource("1_card")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16
+offset_top = 14
+offset_right = -16
+offset_bottom = -14
+theme_override_constants/separation = 8
+mouse_filter = 2
+
+[node name="NameLabel" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 0.4, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="DescLabel" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+mouse_filter = 2

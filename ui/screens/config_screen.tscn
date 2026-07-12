@@ -1,0 +1,61 @@
+[gd_scene load_steps=2 format=3 uid="uid://bconfigscreen001"]
+
+[ext_resource type="Script" path="res://ui/screens/config_screen.gd" id="1_cs"]
+
+[node name="ConfigScreen" type="MarginContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_bottom = 16
+script = ExtResource("1_cs")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BackBtn" type="Button" parent="VBox/Header"]
+custom_minimum_size = Vector2(100, 36)
+layout_mode = 2
+text = "<- Back"
+
+[node name="Title" type="Label" parent="VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.95, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Scroll" type="ScrollContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Rows" type="VBoxContainer" parent="VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 3
+
+[node name="Footer" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ResetBtn" type="Button" parent="VBox/Footer"]
+custom_minimum_size = Vector2(140, 36)
+layout_mode = 2
+text = "Reset Defaults"
+
+[node name="Spacer" type="Control" parent="VBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StartBtn" type="Button" parent="VBox/Footer"]
+custom_minimum_size = Vector2(160, 36)
+layout_mode = 2
+text = "Start Training ->"

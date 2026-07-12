@@ -1,0 +1,65 @@
+[gd_scene load_steps=2 format=3 uid="uid://bgraphviz001"]
+
+[ext_resource type="Script" path="res://ui/components/graph_visualizer.gd" id="1_gv"]
+
+[node name="GraphVisualizer" type="Panel"]
+custom_minimum_size = Vector2(360, 480)
+script = ExtResource("1_gv")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8
+offset_top = 8
+offset_right = -8
+offset_bottom = -8
+theme_override_constants/separation = 4
+
+[node name="SpeciesRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="PrevSpecies" type="Button" parent="VBox/SpeciesRow"]
+custom_minimum_size = Vector2(30, 24)
+layout_mode = 2
+text = "<"
+
+[node name="SpeciesLabel" type="Label" parent="VBox/SpeciesRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+text = "Species -/-"
+
+[node name="NextSpecies" type="Button" parent="VBox/SpeciesRow"]
+custom_minimum_size = Vector2(30, 24)
+layout_mode = 2
+text = ">"
+
+[node name="GenomeRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="PrevGenome" type="Button" parent="VBox/GenomeRow"]
+custom_minimum_size = Vector2(30, 24)
+layout_mode = 2
+text = "<"
+
+[node name="GenomeLabel" type="Label" parent="VBox/GenomeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+text = "Genome -/-"
+
+[node name="NextGenome" type="Button" parent="VBox/GenomeRow"]
+custom_minimum_size = Vector2(30, 24)
+layout_mode = 2
+text = ">"
+
+[node name="GraphView" type="Control" parent="VBox"]
+custom_minimum_size = Vector2(0, 300)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StatsLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = ""
