@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestspider3d001"]
+
+[ext_resource type="Script" path="res://tests/test_spider_3d_scene.gd" id="1_ts3"]
+
+[node name="TestSpider3DScene" type="Node"]
+script = ExtResource("1_ts3")
