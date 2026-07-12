@@ -1,0 +1,81 @@
+[gd_scene load_steps=12 format=3 uid="uid://bpong0001"]
+
+[ext_resource type="Script" path="res://environments/pong/pong_environment.gd" id="1_pong"]
+
+[sub_resource type="RectangleShape2D" id="Shape_wall_top"]
+size = Vector2(4.2, 0.1)
+
+[sub_resource type="RectangleShape2D" id="Shape_wall_bot"]
+size = Vector2(4.2, 0.1)
+
+[sub_resource type="RectangleShape2D" id="Shape_paddle_a"]
+size = Vector2(0.08, 0.5)
+
+[sub_resource type="RectangleShape2D" id="Shape_paddle_b"]
+size = Vector2(0.08, 0.5)
+
+[sub_resource type="CircleShape2D" id="Shape_ball"]
+radius = 0.05
+
+[sub_resource type="RectangleShape2D" id="Shape_score_zone"]
+size = Vector2(0.1, 3.2)
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_ball"]
+friction = 0.0
+bounce = 1.0
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_paddle"]
+friction = 0.0
+bounce = 1.0
+
+[node name="PongEnvironment" type="Node2D"]
+script = ExtResource("1_pong")
+
+[node name="TopWall" type="StaticBody2D" parent="."]
+position = Vector2(0, -1.55)
+
+[node name="TopWallShape" type="CollisionShape2D" parent="TopWall"]
+shape = SubResource("Shape_wall_top")
+
+[node name="BottomWall" type="StaticBody2D" parent="."]
+position = Vector2(0, 1.55)
+
+[node name="BottomWallShape" type="CollisionShape2D" parent="BottomWall"]
+shape = SubResource("Shape_wall_bot")
+
+[node name="PaddleA" type="CharacterBody2D" parent="."]
+position = Vector2(-1.9, 0)
+motion_mode = 1
+
+[node name="PaddleAShape" type="CollisionShape2D" parent="PaddleA"]
+shape = SubResource("Shape_paddle_a")
+
+[node name="PaddleB" type="CharacterBody2D" parent="."]
+position = Vector2(1.9, 0)
+motion_mode = 1
+
+[node name="PaddleBShape" type="CollisionShape2D" parent="PaddleB"]
+shape = SubResource("Shape_paddle_b")
+
+[node name="Ball" type="RigidBody2D" parent="."]
+position = Vector2(0, 0)
+mass = 0.001
+gravity_scale = 0.0
+linear_damp = 0.0
+can_sleep = false
+physics_material_override = SubResource("PhysMat_ball")
+
+[node name="BallShape" type="CollisionShape2D" parent="Ball"]
+shape = SubResource("Shape_ball")
+
+[node name="LeftScoreZone" type="Area2D" parent="."]
+position = Vector2(-2.1, 0)
+
+[node name="LeftZoneShape" type="CollisionShape2D" parent="LeftScoreZone"]
+shape = SubResource("Shape_score_zone")
+
+[node name="RightScoreZone" type="Area2D" parent="."]
+position = Vector2(2.1, 0)
+
+[node name="RightZoneShape" type="CollisionShape2D" parent="RightScoreZone"]
+shape = SubResource("Shape_score_zone")
