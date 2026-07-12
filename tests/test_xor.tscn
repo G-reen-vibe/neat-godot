@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestxor00001"]
+
+[ext_resource type="Script" path="res://tests/test_xor.gd" id="1_xor"]
+
+[node name="TestXor" type="Node"]
+script = ExtResource("1_xor")

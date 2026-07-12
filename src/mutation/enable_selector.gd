@@ -14,9 +14,16 @@ func _init(p_min_count: int = 1, p_rate: float = 0.0) -> void:
         rate = p_rate
 
 func _count_to_select(total: int, ctx: MutationContext) -> int:
+        # Probabilistic interpretation: when rate < 1.0, treat it as the probability
+        # of applying 1 mutation (standard NEAT practice). When rate >= 1.0, treat it
+        # as a count. min_count acts as a floor in both cases.
         var eff_rate := rate * ctx.rate_multiplier
-        var by_rate := int(ceil(eff_rate * float(total)))
-        var n := maxi(min_count, by_rate)
+        var n: int
+        if eff_rate < 1.0:
+                n = 1 if ctx.rng.randf() < eff_rate else 0
+        else:
+                n = int(eff_rate)
+        n = maxi(min_count, n)
         return mini(n, total)
 
 func select(genome: Genome, ctx: MutationContext) -> Array:
