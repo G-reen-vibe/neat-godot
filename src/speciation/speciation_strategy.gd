@@ -121,11 +121,12 @@ class Standard:
 				for sp: Species in species_list:
 						if sp.members.size() > 0:
 								non_empty.append(sp)
-				# Update representatives: keep the previous representative for stability
-				# (standard NEAT practice). Only set a new one if the species is brand new.
+				# Re-elect representatives each generation from current members.
+				# This keeps representatives fresh and prevents stale representatives
+				# from trapping species counts at a fixed number.
 				for sp: Species in non_empty:
-						if sp.representative == null:
-								sp.representative = sp.members[0]
+						if sp.members.size() > 0:
+								sp.representative = sp.members[ctx.rng.randi_range(0, sp.members.size() - 1)]
 				# Dynamic threshold adjustment (NEAT paper):
 				# If we have more species than the target, increase delta to make speciation
 				# stricter. If fewer, decrease delta to make it more permissive.
@@ -133,22 +134,32 @@ class Standard:
 				# quickly rather than creeping by a fixed amount each generation.
 				var count := non_empty.size()
 				if count > target_species_count:
-						# Adjust proportional to how far off we are (squared for faster convergence).
+						# NEAT paper: fixed adjustment proportional to speed.
+						# Using ratio^2 was too aggressive and caused overshooting.
 						var ratio: float = float(count) / float(maxi(1, target_species_count))
-						compatibility_threshold += threshold_up_speed * ratio * ratio
+						compatibility_threshold += threshold_up_speed * ratio
 				elif count < target_species_count:
 						var ratio: float = float(maxi(1, target_species_count)) / float(maxi(1, count))
-						compatibility_threshold -= threshold_down_speed * ratio * ratio
+						compatibility_threshold -= threshold_down_speed * ratio
 				compatibility_threshold = clampf(compatibility_threshold, min_threshold, max_threshold)
 				# Merge if too many species (after threshold adjustment).
+				# Pass count and target so the merge can be more aggressive when
+				# the count is far above target (prevents species count from
+				# getting stuck at a fixed number above target).
 				if count > target_species_count:
-						_merge_similar(non_empty, similarity)
+						_merge_similar(non_empty, similarity, count, target_species_count)
 				return non_empty
 
-		func _merge_similar(species_list: Array, similarity: SimilarityTest) -> void:
+		func _merge_similar(species_list: Array, similarity: SimilarityTest, count: int = 0, target: int = 0) -> void:
 				# Sort by id for determinism.
 				species_list.sort_custom(func(a, b): return a.id < b.id)
+				# Base merge threshold = threshold * merge_ratio.
+				# When count is far above target, scale up the merge threshold
+				# so species actually merge (prevents getting stuck).
 				var merge_threshold := compatibility_threshold * merge_ratio
+				if count > target and target > 0:
+						var excess_ratio: float = float(count) / float(target)
+						merge_threshold *= excess_ratio
 				var i := 0
 				while i < species_list.size():
 						var j := i + 1
@@ -353,14 +364,21 @@ class Purge:
 										max_dist = d
 				var avg_dist: float = total_dist / float(maxi(1, dist_count))
 				if dist_count == 0:
-						# Only one seed; use a moderate threshold.
-						ideal_threshold = 3.0
+						# Only one seed; use the config's threshold.
+						ideal_threshold = standard.compatibility_threshold
 				else:
-						# Threshold = avg_dist + buffer for mutation drift. Each generation,
-						# mutations add ~0-2 new genes (distance ~1-2 each). We want the
-						# threshold high enough to absorb several generations of drift before
-						# a genome is kicked out. Use avg_dist + 3.0 as a reasonable buffer.
-						ideal_threshold = avg_dist + 3.0
+						# Use the MINIMUM pairwise distance between seeds as the
+						# threshold. This is the largest value that keeps all N
+						# seeds in separate species. Using avg_dist + 3.0 was way
+						# too high and caused the species count to never change
+						# because Standard speciation never needed to adjust it.
+						var min_dist: float = 1e9
+						for ii in range(seeds.size()):
+								for jj in range(ii + 1, seeds.size()):
+										var dd: float = similarity.distance(seeds[ii], seeds[jj])
+										if dd < min_dist:
+												min_dist = dd
+						ideal_threshold = min_dist
 				standard.compatibility_threshold = ideal_threshold
 				# Build species: assign each genome to its seed species (already set
 				# via parent_species_id during fill).
