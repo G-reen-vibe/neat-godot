@@ -31,3 +31,12 @@ movie_writer/mjpeg/videostreams=false
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[gdscript]
+
+warnings/inference_on_variant=0
+warnings/unsafe_call_argument=0
+warnings/unsafe_method_access=0
+warnings/unsafe_property_access=0
+warnings/unsafe_cast=0
+warnings/untyped_declaration=0
