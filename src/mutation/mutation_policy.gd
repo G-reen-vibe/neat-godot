@@ -24,92 +24,92 @@ var prune_mutator: PruneMutator = null
 var enable_selector: EnableSelector = null  # no mutator; enabling is the action
 
 func _init() -> void:
-        pass
+	pass
 
 ## Apply the policy to [param genome] using [param ctx]. Subclasses override.
 func apply(genome: Genome, ctx: MutationContext) -> void:
-        pass
+	pass
 
 # --- Helpers shared by subclasses ---
 
 func _apply_weight(genome: Genome, ctx: MutationContext) -> void:
-        if weight_selector == null or weight_mutator == null:
-                return
-        var selected: Array = weight_selector.select(genome, ctx)
-        for c_v: Variant in selected:
-                weight_mutator.mutate(c_v, ctx)
+	if weight_selector == null or weight_mutator == null:
+		return
+	var selected: Array = weight_selector.select(genome, ctx)
+	for c_v: Variant in selected:
+		weight_mutator.mutate(c_v, ctx)
 
 func _apply_connection(genome: Genome, ctx: MutationContext) -> void:
-        if connection_selector == null or connection_mutator == null:
-                return
-        var pairs: Array = connection_selector.select(genome, ctx)
-        connection_mutator.mutate(genome, pairs, ctx)
+	if connection_selector == null or connection_mutator == null:
+		return
+	var pairs: Array = connection_selector.select(genome, ctx)
+	connection_mutator.mutate(genome, pairs, ctx)
 
 func _apply_neuron(genome: Genome, ctx: MutationContext) -> void:
-        if neuron_selector == null or neuron_mutator == null:
-                return
-        var selected: Array = neuron_selector.select(genome, ctx)
-        neuron_mutator.mutate(genome, selected, ctx)
+	if neuron_selector == null or neuron_mutator == null:
+		return
+	var selected: Array = neuron_selector.select(genome, ctx)
+	neuron_mutator.mutate(genome, selected, ctx)
 
 func _apply_prune(genome: Genome, ctx: MutationContext) -> void:
-        if prune_selector == null or prune_mutator == null:
-                return
-        var selected: Array = prune_selector.select(genome, ctx)
-        prune_mutator.mutate(genome, selected, ctx)
+	if prune_selector == null or prune_mutator == null:
+		return
+	var selected: Array = prune_selector.select(genome, ctx)
+	prune_mutator.mutate(genome, selected, ctx)
 
 func _apply_enable(genome: Genome, ctx: MutationContext) -> void:
-        if enable_selector == null:
-                return
-        var selected: Array = enable_selector.select(genome, ctx)
-        for c_v: Variant in selected:
-                var c: ConnectionGene = c_v
-                # In topological mode, check that re-enabling won't create a loop.
-                if ctx.forbid_loops and genome.would_create_loop(c.from_node, c.to_node):
-                        continue
-                c.enabled = true
-                genome.mark_dirty()
+	if enable_selector == null:
+		return
+	var selected: Array = enable_selector.select(genome, ctx)
+	for c_v: Variant in selected:
+		var c: ConnectionGene = c_v
+		# In topological mode, check that re-enabling won't create a loop.
+		if ctx.forbid_loops and genome.would_create_loop(c.from_node, c.to_node):
+			continue
+		c.enabled = true
+		genome.mark_dirty()
 
 
 ## Standard NEAT mutation policy.
 class General:
-        extends MutationPolicy
+	extends MutationPolicy
 
-        # Multiplier applied to every selector's effective rate.
-        var rate_multiplier: float = 1.0
-        # If true, apply all configured mutation types in sequence.
-        # If false, pick one configured mutation type uniformly at random.
-        var stacked: bool = true
+	# Multiplier applied to every selector's effective rate.
+	var rate_multiplier: float = 1.0
+	# If true, apply all configured mutation types in sequence.
+	# If false, pick one configured mutation type uniformly at random.
+	var stacked: bool = true
 
-        func _init(p_stacked: bool = true, p_rate_multiplier: float = 1.0) -> void:
-                super()
-                stacked = p_stacked
-                rate_multiplier = p_rate_multiplier
+	func _init(p_stacked: bool = true, p_rate_multiplier: float = 1.0) -> void:
+		super()
+		stacked = p_stacked
+		rate_multiplier = p_rate_multiplier
 
-        func apply(genome: Genome, ctx: MutationContext) -> void:
-                ctx.rate_multiplier = rate_multiplier
-                if stacked:
-                        _apply_weight(genome, ctx)
-                        _apply_connection(genome, ctx)
-                        _apply_neuron(genome, ctx)
-                        _apply_prune(genome, ctx)
-                        _apply_enable(genome, ctx)
-                else:
-                        # Build a list of available mutation ops.
-                        var ops: Array[Callable] = []
-                        if weight_selector != null and weight_mutator != null:
-                                ops.append(_apply_weight)
-                        if connection_selector != null and connection_mutator != null:
-                                ops.append(_apply_connection)
-                        if neuron_selector != null and neuron_mutator != null:
-                                ops.append(_apply_neuron)
-                        if prune_selector != null and prune_mutator != null:
-                                ops.append(_apply_prune)
-                        if enable_selector != null:
-                                ops.append(_apply_enable)
-                        if ops.is_empty():
-                                return
-                        var idx := ctx.rng.randi_range(0, ops.size() - 1)
-                        ops[idx].call(genome, ctx)
+	func apply(genome: Genome, ctx: MutationContext) -> void:
+		ctx.rate_multiplier = rate_multiplier
+		if stacked:
+			_apply_weight(genome, ctx)
+			_apply_connection(genome, ctx)
+			_apply_neuron(genome, ctx)
+			_apply_prune(genome, ctx)
+			_apply_enable(genome, ctx)
+		else:
+			# Build a list of available mutation ops.
+			var ops: Array[Callable] = []
+			if weight_selector != null and weight_mutator != null:
+				ops.append(_apply_weight)
+			if connection_selector != null and connection_mutator != null:
+				ops.append(_apply_connection)
+			if neuron_selector != null and neuron_mutator != null:
+				ops.append(_apply_neuron)
+			if prune_selector != null and prune_mutator != null:
+				ops.append(_apply_prune)
+			if enable_selector != null:
+				ops.append(_apply_enable)
+			if ops.is_empty():
+				return
+			var idx := ctx.rng.randi_range(0, ops.size() - 1)
+			ops[idx].call(genome, ctx)
 
 
 ## Phased Pruning policy. Alternates between growth and pruning phases.
@@ -117,36 +117,36 @@ class General:
 ## During pruning: prune and enable mutations are applied with an aggressive
 ## rate multiplier.
 class PhasedPruning:
-        extends MutationPolicy
+	extends MutationPolicy
 
-        # Number of generations per phase.
-        var phase_length: int = 5
-        # Multiplier applied to mutation rates during the pruning phase.
-        var pruning_rate_multiplier: float = 3.0
-        # Multiplier applied during the growth phase.
-        var growth_rate_multiplier: float = 1.0
-        # Current generation counter (advanced externally via [method advance_generation]).
-        var _generation: int = 0
+	# Number of generations per phase.
+	var phase_length: int = 5
+	# Multiplier applied to mutation rates during the pruning phase.
+	var pruning_rate_multiplier: float = 3.0
+	# Multiplier applied during the growth phase.
+	var growth_rate_multiplier: float = 1.0
+	# Current generation counter (advanced externally via [method advance_generation]).
+	var _generation: int = 0
 
-        func _init(p_phase_length: int = 5, p_pruning_rate_multiplier: float = 3.0) -> void:
-                super()
-                phase_length = p_phase_length
-                pruning_rate_multiplier = p_pruning_rate_multiplier
+	func _init(p_phase_length: int = 5, p_pruning_rate_multiplier: float = 3.0) -> void:
+		super()
+		phase_length = p_phase_length
+		pruning_rate_multiplier = p_pruning_rate_multiplier
 
-        func advance_generation() -> void:
-                _generation += 1
+	func advance_generation() -> void:
+		_generation += 1
 
-        func _in_pruning_phase() -> bool:
-                # Cycle: phase_length growth, then phase_length pruning.
-                return (_generation % (2 * phase_length)) >= phase_length
+	func _in_pruning_phase() -> bool:
+		# Cycle: phase_length growth, then phase_length pruning.
+		return (_generation % (2 * phase_length)) >= phase_length
 
-        func apply(genome: Genome, ctx: MutationContext) -> void:
-                if _in_pruning_phase():
-                        ctx.rate_multiplier = pruning_rate_multiplier
-                        _apply_prune(genome, ctx)
-                        _apply_enable(genome, ctx)
-                else:
-                        ctx.rate_multiplier = growth_rate_multiplier
-                        _apply_weight(genome, ctx)
-                        _apply_connection(genome, ctx)
-                        _apply_neuron(genome, ctx)
+	func apply(genome: Genome, ctx: MutationContext) -> void:
+		if _in_pruning_phase():
+			ctx.rate_multiplier = pruning_rate_multiplier
+			_apply_prune(genome, ctx)
+			_apply_enable(genome, ctx)
+		else:
+			ctx.rate_multiplier = growth_rate_multiplier
+			_apply_weight(genome, ctx)
+			_apply_connection(genome, ctx)
+			_apply_neuron(genome, ctx)

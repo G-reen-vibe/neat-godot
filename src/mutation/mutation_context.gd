@@ -25,6 +25,6 @@ var forbid_loops: bool = true
 var rate_multiplier: float = 1.0
 
 func _init(p_rng: RandomNumberGenerator = null, p_tracker: InnovationTracker = null, p_species: Species = null) -> void:
-        rng = p_rng if p_rng != null else RandomNumberGenerator.new()
-        tracker = p_tracker if p_tracker != null else InnovationTracker.new()
-        species = p_species
+	rng = p_rng if p_rng != null else RandomNumberGenerator.new()
+	tracker = p_tracker if p_tracker != null else InnovationTracker.new()
+	species = p_species
