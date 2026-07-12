@@ -90,9 +90,11 @@ func reset(rng: RandomNumberGenerator = null) -> void:
         _hits_b = 0
 
 func initial_state() -> Dictionary:
-        return _build_state_dict()
+        return _build_state_dict_for_a()
 
-func _build_state_dict() -> Dictionary:
+## Build the state dict from player A's perspective (left paddle).
+## own = paddle_a, opp = paddle_b. Ball x/velocity are in world frame.
+func _build_state_dict_for_a() -> Dictionary:
         # Normalize to [-1, 1] for the network.
         var d: Dictionary = {}
         d[input_node_ids[0]] = _ball_x / (FIELD_WIDTH * 0.5)
@@ -102,6 +104,32 @@ func _build_state_dict() -> Dictionary:
         d[input_node_ids[4]] = _paddle_a_y / (FIELD_HEIGHT * 0.5)
         d[input_node_ids[5]] = _paddle_b_y / (FIELD_HEIGHT * 0.5)
         return d
+
+## Build the state dict from player B's perspective (right paddle).
+## The field is mirrored left-right so that B sees the same "geometry" as A:
+## ball_x is negated (so negative = ball on B's side, approaching B),
+## ball_vx is negated (so negative = moving toward B), and the paddle
+## positions are swapped so that input[4] is always "own" and input[5]
+## is always "opp". This lets a single genome play both sides without
+## having to learn a mirrored mapping.
+func _build_state_dict_for_b() -> Dictionary:
+        var d: Dictionary = {}
+        d[input_node_ids[0]] = -_ball_x / (FIELD_WIDTH * 0.5)
+        d[input_node_ids[1]] = _ball_y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[2]] = -_ball_vx / BALL_SPEED
+        d[input_node_ids[3]] = _ball_vy / BALL_SPEED
+        # B's own paddle is paddle_b; opponent is paddle_a.
+        d[input_node_ids[4]] = _paddle_b_y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[5]] = _paddle_a_y / (FIELD_HEIGHT * 0.5)
+        return d
+
+## Returns the state dict from the given player's perspective.
+## Used by tournament evaluators so both players see a consistent frame.
+func get_state_for_player(player: int) -> Dictionary:
+        # player 0 = A, player 1 = B.
+        if player == 1:
+                return _build_state_dict_for_b()
+        return _build_state_dict_for_a()
 
 func interpret_output(output_a: Dictionary, output_b: Dictionary = {}) -> Dictionary:
         var a_action: float = float(output_a.get(output_node_id, 0.0))
@@ -163,7 +191,8 @@ func step(action: Dictionary) -> Dictionary:
                 _done = true
         if _steps >= MAX_STEPS:
                 _done = true
-        return _build_state_dict()
+        # Return A's perspective by default (the evaluator uses this).
+        return _build_state_dict_for_a()
 
 func _reset_ball(direction: float) -> void:
         _ball_x = 0.0

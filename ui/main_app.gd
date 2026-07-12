@@ -851,12 +851,13 @@ func _build_run_screen() -> void:
         help_bar.add_child(_solved_label)
         left_vbox.add_child(help_bar)
         # Right side: TabContainer with Genome View | Training Stats | Save/Load.
-        # Wrapped in a PanelContainer for a border; uses SIZE_FILL with a stretch
-        # ratio so it gets a fixed fraction of the width (not cut off).
+        # Uses SIZE_EXPAND_FILL with a stretch ratio so it gets a fixed fraction
+        # of the width. The minimum size matches the widest child (360px for the
+        # graph visualizer) so content is never cut off.
         _right_tabs = TabContainer.new()
-        _right_tabs.size_flags_horizontal = Control.SIZE_FILL
-        _right_tabs.size_flags_stretch_ratio = 0.38  # ~38% of width
-        _right_tabs.custom_minimum_size = Vector2(320, 0)
+        _right_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _right_tabs.size_flags_stretch_ratio = 0.42  # ~30% of width
+        _right_tabs.custom_minimum_size = Vector2(380, 0)
         _right_tabs.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.08, 0.12), Color(0.2, 0.2, 0.28), 1, 4))
         # Tab 1: Genome view.
         var genome_tab := PanelContainer.new()
@@ -1020,8 +1021,10 @@ func _step_pong_generation() -> void:
                         state = env.initial_state()
                         steps = 0
                         while not env.is_done() and steps < 1200:
+                                # Player A sees A's perspective; Player B sees B's (mirrored).
+                                var state_b: Dictionary = env.get_state_for_player(1)
                                 var out_a: Dictionary = g.forward(state, "topological")
-                                var out_b: Dictionary = opp.forward(state, "topological")
+                                var out_b: Dictionary = opp.forward(state_b, "topological")
                                 var action: Dictionary = env.interpret_output(out_a, out_b)
                                 state = env.step(action)
                                 steps += 1
