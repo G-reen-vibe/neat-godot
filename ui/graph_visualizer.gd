@@ -143,7 +143,7 @@ func _refresh() -> void:
 	for m: Genome in sp.members:
 		avg_fit += m.fitness
 	avg_fit /= float(sp.members.size())
-	_stats_label.text = "Genome: nodes=%d conns=%d fit=%.3f\nSpecies: members=%d best=%.3f avg=%.3f stale=%d alloc=%d mr×%.2f" % [
+	_stats_label.text = "Genome: nodes=%d conns=%d fit=%.3f\nSpecies: members=%d best=%.3f avg=%.3f stale=%d alloc=%d mrx%.2f" % [
 		g.node_count(), g.connection_count(), g.fitness,
 		sp.members.size(), sp.best_fitness, avg_fit, sp.staleness,
 		sp.allocated_children, sp.mutation_rate_multiplier,

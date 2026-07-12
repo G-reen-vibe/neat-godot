@@ -180,7 +180,7 @@ func _config_to_dict(c: NeatConfig) -> Dictionary:
         var d: Dictionary = {}
         # Properties to skip: underscore-prefixed (private), "script" (engine),
         # and "threshold_adjustment_speed" (a getter/setter alias that sets both
-        # threshold_up_speed and threshold_down_speed — serializing it would
+        # threshold_up_speed and threshold_down_speed -- serializing it would
         # override the individual up/down values on load).
         var skip: Array = ["script", "threshold_adjustment_speed"]
         for prop in c.get_property_list():

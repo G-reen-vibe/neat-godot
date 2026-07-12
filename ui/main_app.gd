@@ -1,14 +1,14 @@
 extends Control
 ## ============================================================
-## NEAT Godot — Main Application
+## NEAT Godot -- Main Application
 ## ============================================================
 ## A proper multi-screen UI for training NEAT networks:
-##   1. Environment Selection — pick one of 6 envs
-##   2. Configuration — tune hyperparameters with sensible defaults
-##   3. Training — live visualization + graph view + stats
+##   1. Environment Selection -- pick one of 6 envs
+##   2. Configuration -- tune hyperparameters with sensible defaults
+##   3. Training -- live visualization + graph view + stats
 ##
 ## All layout uses Godot-standard containers (MarginContainer, VBoxContainer,
-## HBoxContainer, ScrollContainer, PanelContainer) — no absolute positioning.
+## HBoxContainer, ScrollContainer, PanelContainer) -- no absolute positioning.
 ## ============================================================
 
 # === Screen state ===
@@ -326,7 +326,7 @@ func _build_config_screen() -> void:
         # Header bar (HBox).
         var header := HBoxContainer.new()
         header.add_theme_constant_override("separation", 12)
-        var back_btn := _make_button("← Back", Vector2(100, 36))
+        var back_btn := _make_button("<- Back", Vector2(100, 36))
         back_btn.pressed.connect(func(): _show_screen(ScreenState.ENV_SELECT))
         header.add_child(back_btn)
         _config_title = Label.new()
@@ -352,7 +352,7 @@ func _build_config_screen() -> void:
         var spacer := Control.new()
         spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         footer.add_child(spacer)
-        var start_btn := _make_button("Start Training →", Vector2(160, 36))
+        var start_btn := _make_button("Start Training ->", Vector2(160, 36))
         start_btn.pressed.connect(_start_training)
         footer.add_child(start_btn)
         vbox.add_child(footer)
@@ -366,7 +366,7 @@ func _build_config_controls() -> void:
         _config_controls.clear()
         _config_deps.clear()
         # Update title.
-        _config_title.text = "%s — Configuration" % ENVS[_env_idx]["name"]
+        _config_title.text = "%s -- Configuration" % ENVS[_env_idx]["name"]
         # Build VBox for config rows inside scroll.
         _config_vbox = VBoxContainer.new()
         _config_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -385,7 +385,7 @@ func _build_config_controls() -> void:
                         var row := _make_config_row(entry)
                         _config_vbox.add_child(row)
                         if entry.has("visible_when"):
-                                # visible_when: {key: value, ...} — ALL must match (AND).
+                                # visible_when: {key: value, ...} -- ALL must match (AND).
                                 _config_deps.append({
                                         "key": entry["key"],
                                         "conditions": entry["visible_when"],
@@ -393,7 +393,7 @@ func _build_config_controls() -> void:
                                         "row": row,
                                 })
                         elif entry.has("visible_when_any"):
-                                # visible_when_any: {key: [v1, v2, ...]} — key must match ANY (OR).
+                                # visible_when_any: {key: [v1, v2, ...]} -- key must match ANY (OR).
                                 _config_deps.append({
                                         "key": entry["key"],
                                         "conditions": entry["visible_when_any"],
@@ -601,13 +601,13 @@ func _start_training() -> void:
         if _speed_btn:
                 _speed_btn.selected = 0
         if _pause_btn:
-                _pause_btn.text = "▶ Run"
+                _pause_btn.text = "> Run"
         _setup_run_for_env()
         _show_screen(ScreenState.RUNNING)
         _update_run_ui()
 
 # ============================================================
-# Config schema — comprehensive, covers ALL NeatConfig fields
+# Config schema -- comprehensive, covers ALL NeatConfig fields
 # ============================================================
 
 func _get_config_schema() -> Array:
@@ -815,8 +815,8 @@ func _get_config_schema() -> Array:
                 {"key": "biased_average_strength", "label": "Biased Average Strength", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
                  "visible_when": {"neuron_crossover_method": "biased_average"}},
                 {"key": "selection_method", "label": "Parent Selection Method", "type": "enum", "options": [
-                        ["Roulette (prob ∝ fitness)", "roulette"],
-                        ["Inverse Roulette (prob ∝ 1/fitness)", "inverse_roulette"],
+                        ["Roulette (prob proportional to fitness)", "roulette"],
+                        ["Inverse Roulette (prob proportional to 1/fitness)", "inverse_roulette"],
                         ["Gaussian (sample N(mean,std))", "gaussian"],
                         ["Triangular (front-loaded index)", "triangular"],
                         ["Uniform (random)", "uniform"],
@@ -912,16 +912,16 @@ func _build_run_screen() -> void:
         # Header bar.
         var header := HBoxContainer.new()
         header.add_theme_constant_override("separation", 8)
-        var back_btn := _make_button("← Menu", Vector2(90, 32))
+        var back_btn := _make_button("<- Menu", Vector2(90, 32))
         back_btn.pressed.connect(func(): _show_screen(ScreenState.ENV_SELECT))
         header.add_child(back_btn)
-        var config_btn := _make_button("⚙ Config", Vector2(90, 32))
+        var config_btn := _make_button("* Config", Vector2(90, 32))
         config_btn.pressed.connect(func():
                 _show_screen(ScreenState.CONFIG)
                 _build_config_controls()
         )
         header.add_child(config_btn)
-        var restart_btn := _make_button("↻ Restart", Vector2(90, 32))
+        var restart_btn := _make_button("(R) Restart", Vector2(90, 32))
         restart_btn.pressed.connect(_restart_training)
         header.add_child(restart_btn)
         _stats_label = Label.new()
@@ -932,15 +932,15 @@ func _build_run_screen() -> void:
         _stats_label.position.y = 6
         header.add_child(_stats_label)
         _pause_btn = Button.new()
-        _pause_btn.text = "⏸ Pause"
+        _pause_btn.text = "|| Pause"
         _pause_btn.custom_minimum_size = Vector2(90, 32)
         _pause_btn.pressed.connect(_toggle_pause)
         header.add_child(_pause_btn)
         _speed_btn = OptionButton.new()
-        _speed_btn.add_item("1×")
-        _speed_btn.add_item("2×")
-        _speed_btn.add_item("5×")
-        _speed_btn.add_item("10×")
+        _speed_btn.add_item("1x")
+        _speed_btn.add_item("2x")
+        _speed_btn.add_item("5x")
+        _speed_btn.add_item("10x")
         _speed_btn.add_item("Max")
         _speed_btn.selected = 0
         _speed_btn.custom_minimum_size = Vector2(70, 32)
@@ -1031,12 +1031,12 @@ func _setup_run_for_env() -> void:
         # Ensure paused state.
         _auto_run = false
         if _pause_btn:
-                _pause_btn.text = "▶ Run"
+                _pause_btn.text = "> Run"
 
 func _toggle_pause() -> void:
         _auto_run = not _auto_run
         if _pause_btn:
-                _pause_btn.text = "▶ Run" if not _auto_run else "⏸ Pause"
+                _pause_btn.text = "> Run" if not _auto_run else "|| Pause"
 
 func _restart_training() -> void:
         if _config == null:
@@ -1078,7 +1078,7 @@ func _step_generation() -> void:
                 _solved = true
                 _auto_run = false
                 if _pause_btn:
-                        _pause_btn.text = "▶ Run"
+                        _pause_btn.text = "> Run"
 
 func _apply_pending_load() -> void:
         var data: Dictionary = _save_load_view.take_pending_load()
@@ -1094,7 +1094,7 @@ func _apply_pending_load() -> void:
                 _solved = false
                 _auto_run = false
                 if _pause_btn:
-                        _pause_btn.text = "▶ Run"
+                        _pause_btn.text = "> Run"
                 # Re-setup UI for the new population.
                 _visualizer.population = _pop
                 _save_load_view.population = _pop
@@ -1193,7 +1193,7 @@ func _update_run_ui() -> void:
                 _pop.species_count(), avg_nodes, avg_conns
         ]
         if _solved:
-                _solved_label.text = "✓ SOLVED!"
+                _solved_label.text = "OK SOLVED!"
         else:
                 _solved_label.text = ""
         _visualizer.refresh()
@@ -1264,7 +1264,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.phased_phase_length = 5
         c.phased_pruning_rate_multiplier = 3.0
 
-        # --- Weight mutation: single mode, 80% chance, uniform delta ±0.5 ---
+        # --- Weight mutation: single mode, 80% chance, uniform delta +/-0.5 ---
         c.enable_weight_mutation = true
         c.weight_mutation_mode = "single"
         c.weight_mutation_rate = 0.8

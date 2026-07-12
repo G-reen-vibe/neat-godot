@@ -7,7 +7,7 @@
 class_name WeightMutator
 extends RefCounted
 
-## Clamp applied to the resulting weight. Set to ±INF to disable.
+## Clamp applied to the resulting weight. Set to +/-INF to disable.
 var clamp_min: float = -1e9
 var clamp_max: float = 1e9
 

@@ -100,7 +100,7 @@ func _compute_knee_world(leg_idx: int) -> Vector3:
         var hip := _compute_hip_world(leg_idx)
         var base: float = _leg_base_angles[leg_idx]
         var yaw: float = base + _hip_yaw[leg_idx]
-        # Pitch=0 means leg points straight DOWN. pitch=π/2 means horizontal.
+        # Pitch=0 means leg points straight DOWN. pitch=pi/2 means horizontal.
         # This matches a natural resting pose where legs reach the ground.
         var pitch: float = _hip_pitch[leg_idx]
         var dir := Vector3(cos(yaw) * sin(pitch), -cos(pitch), sin(yaw) * sin(pitch)).normalized()

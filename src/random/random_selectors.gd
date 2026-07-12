@@ -12,9 +12,9 @@
 ##                         pick the closest item.
 ##   - [method triangular] pick an index from a triangular distribution using
 ##                         the literal formula given in the project spec.
-##   - [method roulette]   probability ∝ value / sum(values).
+##   - [method roulette]   probability proportional to value / sum(values).
 ##   - [method inverse_roulette]
-##                         probability ∝ (max - value) / sum(max - values).
+##                         probability proportional to (max - value) / sum(max - values).
 class_name RandomSelectors
 
 const _EPS: float = 1e-9
@@ -55,9 +55,9 @@ static func gaussian(items: Array, values: Array, rng: RandomNumberGenerator) ->
 ## The spec gave the formula:
 ## [code]
 ##   a = items.Count
-##   b = 200 / a²
+##   b = 200 / a^2
 ##   seed = RFloat(0, 100)
-##   index = (int)(b*a - sqrt((b*a)² - 2*b*seed) / b)
+##   index = (int)(b*a - sqrt((b*a)^2 - 2*b*seed) / b)
 ## [/code]
 ## Taken literally (with C# operator precedence), the sqrt-term is divided by
 ## [code]b[/code] *first* and then subtracted from [code]b*a[/code]; this
@@ -65,7 +65,7 @@ static func gaussian(items: Array, values: Array, rng: RandomNumberGenerator) ->
 ## the formula is almost certainly a parenthesization typo. Mathematically the
 ## inverse CDF of a triangular distribution peaked at index 0 with base [0, a]
 ## is [code]x = a - (a/10) * sqrt(100 - seed)[/code], which is exactly what
-## [code](b*a - sqrt((b*a)² - 2*b*seed)) / b[/code] simplifies to. We implement
+## [code](b*a - sqrt((b*a)^2 - 2*b*seed)) / b[/code] simplifies to. We implement
 ## that version (numerator parenthesised) and clamp the result to be safe.
 static func triangular(items: Array, values: Array, rng: RandomNumberGenerator) -> Variant:
 	var n := items.size()

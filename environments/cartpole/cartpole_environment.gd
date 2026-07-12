@@ -1,6 +1,6 @@
 ## Classic CartPole environment with custom physics (no Godot physics engine).
-## State: (x, x_dot, theta, theta_dot) — 4 inputs.
-## Action: discrete 0 (push left) or 1 (push right) — 1 binary output.
+## State: (x, x_dot, theta, theta_dot) -- 4 inputs.
+## Action: discrete 0 (push left) or 1 (push right) -- 1 binary output.
 ## Done when |x| > x_threshold or |theta| > theta_threshold or step >= max_steps.
 ## Fitness = total steps survived (capped at max_steps).
 ##

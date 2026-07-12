@@ -22,7 +22,7 @@ func _ready() -> void:
 	print("Expected ratios: 0.067,0.133,0.200,0.267,0.333")
 	_ensure_within(counts, [0.067, 0.133, 0.200, 0.267, 0.333], 0.05)
 
-	# Inverse roulette: probs ∝ (5 - value); sum=10
+	# Inverse roulette: probs proportional to (5 - value); sum=10
 	# -> 0.4, 0.3, 0.2, 0.1, 0.0
 	counts = {0:0, 1:0, 2:0, 3:0, 4:0}
 	for _i in range(N):

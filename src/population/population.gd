@@ -58,7 +58,7 @@ func _build_strategies() -> void:
 ## Then we:
 ##   1. Add a random number of hidden nodes (init_min_hidden_nodes..init_max_hidden_nodes).
 ##   2. Add a random number of connections (init_min_connections..init_max_connections),
-##      clamped to the maximum feasible count (all possible source→target pairs).
+##      clamped to the maximum feasible count (all possible source->target pairs).
 ##   3. Each connection's weight is sampled uniformly from [init_weight_min, init_weight_max].
 ##
 ## This produces diverse starting topologies so speciation has meaningful
@@ -126,7 +126,7 @@ func _build_random_genome(input_ids: Array[int], bias_id: int, output_ids: Array
                 targets.append(hid)
         # Step 2: Compute the maximum feasible connections.
         # A connection goes from any non-output node to any non-input/bias node.
-        # Max = |sources| × |targets|, minus self-loops (hidden→same hidden).
+        # Max = |sources| x |targets|, minus self-loops (hidden->same hidden).
         var max_feasible: int = 0
         for src in sources:
                 for dst in targets:
@@ -144,20 +144,20 @@ func _build_random_genome(input_ids: Array[int], bias_id: int, output_ids: Array
                                 continue
                         # In topological mode, skip pairs that would create a loop.
                         # For initialization, we only add feedforward connections:
-                        # inputs/bias → hidden/output, hidden → hidden/output (with id ordering).
+                        # inputs/bias -> hidden/output, hidden -> hidden/output (with id ordering).
                         # This avoids loops in topological mode.
                         if config.forward_mode == "topological":
                                 # Only allow forward edges: src id < dst id (rough topological order).
                                 # Bias and inputs have lowest ids, then hidden (allocated later), then outputs.
                                 # Actually outputs were allocated before hidden, so we need a different check.
-                                # Use the kind: INPUT/BIAS → anything; HIDDEN → HIDDEN (higher id) or OUTPUT.
+                                # Use the kind: INPUT/BIAS -> anything; HIDDEN -> HIDDEN (higher id) or OUTPUT.
                                 var src_node: NodeGene = g.get_node(src)
                                 var dst_node: NodeGene = g.get_node(dst)
                                 if src_node.kind == NodeGene.Kind.INPUT or src_node.kind == NodeGene.Kind.BIAS:
                                         pass  # inputs can connect to anything
                                 elif src_node.kind == NodeGene.Kind.HIDDEN:
                                         if dst_node.kind == NodeGene.Kind.HIDDEN and dst <= src:
-                                                continue  # hidden → hidden only forward (higher id)
+                                                continue  # hidden -> hidden only forward (higher id)
                                         if dst_node.kind == NodeGene.Kind.INPUT or dst_node.kind == NodeGene.Kind.BIAS:
                                                 continue  # no backward to inputs
                                 elif src_node.kind == NodeGene.Kind.OUTPUT:

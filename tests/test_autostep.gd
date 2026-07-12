@@ -25,6 +25,6 @@ func _test_env_autostep(env_idx: int) -> void:
 	for i in range(5):
 		app._step_generation()
 		if app._solved:
-			print("  %s: SOLVED at gen %d (fit=%.2f) — OK" % [env_name, app._pop.generation, app._pop.best_fitness])
+			print("  %s: SOLVED at gen %d (fit=%.2f) -- OK" % [env_name, app._pop.generation, app._pop.best_fitness])
 			return
-	print("  %s: ran %d gens, best=%.2f — OK" % [env_name, app._pop.generation, app._pop.best_fitness])
+	print("  %s: ran %d gens, best=%.2f -- OK" % [env_name, app._pop.generation, app._pop.best_fitness])

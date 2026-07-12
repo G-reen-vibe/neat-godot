@@ -14,7 +14,7 @@ func _ready() -> void:
 	assert(app._screen == app.ScreenState.ENV_SELECT, "Should start on ENV_SELECT")
 	print("  env select: OK")
 
-	# Test selecting each env → config screen → start training.
+	# Test selecting each env -> config screen -> start training.
 	for env_idx in range(6):
 		_test_env_flow(env_idx)
 

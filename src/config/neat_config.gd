@@ -27,9 +27,9 @@ var initial_weight_range: float = 1.0
 # init_min_hidden_nodes / init_max_hidden_nodes: range of extra hidden nodes
 #   to add per genome (in addition to the bare inputs/outputs/bias).
 # init_min_connections / init_max_connections: range of total connections
-#   (including the initial input→output links) to aim for per genome.
+#   (including the initial input->output links) to aim for per genome.
 #   The actual count is clamped to the maximum feasible (all possible
-#   source→target pairs given the genome's nodes).
+#   source->target pairs given the genome's nodes).
 # init_weight_min / init_weight_max: range for initial connection weights.
 var init_min_hidden_nodes: int = 0
 var init_max_hidden_nodes: int = 3
@@ -77,7 +77,7 @@ var threshold_adjustment_speed: float:
         set(v):
                 threshold_up_speed = v
                 threshold_down_speed = v
-# Merge ratio: species closer than threshold × merge_ratio are merged.
+# Merge ratio: species closer than threshold x merge_ratio are merged.
 var merge_ratio: float = 0.5
 # Min/max bounds for the threshold.
 var min_threshold: float = 0.5

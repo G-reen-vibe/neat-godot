@@ -7,7 +7,7 @@
 ## friction that propels the body forward when legs push backward.
 ##
 ## This is a proper rigid-body simulation (Verlet integration + constraint
-## relaxation) that runs entirely in script — no Godot SceneTree needed.
+## relaxation) that runs entirely in script -- no Godot SceneTree needed.
 ##
 ## Inputs (12): for each of 4 legs: (touch, hip_angle, knee_angle)
 ## Outputs (8): for each of 4 legs: (hip_target_delta, knee_target_delta)
@@ -169,7 +169,7 @@ func step(action: Dictionary) -> Dictionary:
         _body_vy -= GRAVITY * DT
         # Foot-pinning + friction: for each grounded foot, the foot's world position
         # should stay fixed (static friction). Since foot_world = body + leg_offset,
-        # Δfoot_world = Δbody + Δleg_offset = 0 => Δbody = -Δleg_offset.
+        # Deltafoot_world = Deltabody + Deltaleg_offset = 0 => Deltabody = -Deltaleg_offset.
         # Also apply horizontal friction to slow slipping.
         var feet_on_ground: int = 0
         var body_dx: float = 0.0

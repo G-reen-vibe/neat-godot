@@ -1,5 +1,5 @@
 ## XOR environment: 2 inputs + 1 bias, 1 output.
-## Fitness = (4 - total_error)² so max = 16 when error = 0.
+## Fitness = (4 - total_error)^2 so max = 16 when error = 0.
 ## Considered solved when fitness >= 15.5 (total error <= ~0.12).
 class_name XorEnvironment
 extends NeatEnvironment

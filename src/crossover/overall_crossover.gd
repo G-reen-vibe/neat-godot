@@ -25,7 +25,7 @@ func _init(p_neuron_crossover: NeuronCrossover = null) -> void:
 ## Produce a child genome from parents [param parent_a] (assumed fitter) and
 ## [param parent_b]. [param ctx] provides the RNG.
 func crossover(parent_a: Genome, parent_b: Genome, ctx: MutationContext) -> Genome:
-	# Default: standard NEAT crossover — shared connections get neuron-crossover
+	# Default: standard NEAT crossover -- shared connections get neuron-crossover
 	# weight; disjoints/excess inherited from parent_a (the fitter).
 	if neuron_crossover != null:
 		neuron_crossover.begin_crossover(parent_a, parent_b, ctx)

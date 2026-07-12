@@ -2,10 +2,10 @@
 ## Two-link underactuated pendulum: actuate only the second joint, goal is to
 ## swing the tip of the second link above the height threshold.
 ##
-## State: (theta1, theta2, theta1_dot, theta2_dot) — but networks receive
+## State: (theta1, theta2, theta1_dot, theta2_dot) -- but networks receive
 ## (cos(theta1), sin(theta1), cos(theta2), sin(theta2), theta1_dot, theta2_dot)
 ## as inputs (6 inputs) per the standard Gym formulation.
-## Action: torque on joint 2 in {-1, 0, +1} — 1 output with discretization.
+## Action: torque on joint 2 in {-1, 0, +1} -- 1 output with discretization.
 ## Done when tip y > 1.0 (height threshold) or step >= max_steps.
 ## Fitness = (max_steps - steps_taken) + 10 * (tip_y_at_end / 2) so that
 ## solutions that swing up faster and higher get more reward.

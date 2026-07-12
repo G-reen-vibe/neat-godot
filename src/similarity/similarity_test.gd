@@ -3,12 +3,12 @@
 ##
 ## Implementations:
 ##   - [Standard]: classic NEAT compatibility distance from the original paper:
-##       δ = (c1 * E + c2 * D) / N + c3 * W_avg
+##       delta = (c1 * E + c2 * D) / N + c3 * W_avg
 ##     where E = #excess genes, D = #disjoint genes, N = max(|A|, |B|) (or 1 if small),
 ##     W_avg = average weight difference over shared genes.
 ##   - [Percentage]: treats missing connections as having weight 0, then
-##       diff = Σ |w_a - w_b|  over all innovations present in either
-##       total = Σ |w_a| + |w_b|  over all innovations present in either
+##       diff = Sigma |w_a - w_b|  over all innovations present in either
+##       total = Sigma |w_a| + |w_b|  over all innovations present in either
 ##       pct  = diff / total
 ##     This naturally handles missing genes (treats them as weight 0) and
 ##     returns a value in [0, 1] that can be thresholded directly.
@@ -81,8 +81,8 @@ class Standard:
 
 class Percentage:
 	extends SimilarityTest
-	# diff = Σ |w_a - w_b| over all innovations in either (missing -> 0)
-	# total = Σ |w_a| + |w_b| over all innovations in either
+	# diff = Sigma |w_a - w_b| over all innovations in either (missing -> 0)
+	# total = Sigma |w_a| + |w_b| over all innovations in either
 	# pct = diff / total
 	# Returns 0 if both genomes are empty.
 

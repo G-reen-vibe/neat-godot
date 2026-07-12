@@ -41,15 +41,15 @@ class Single:
 
 class Standard:
         extends SpeciationStrategy
-        # The compatibility threshold δ. Two genomes belong to the same species if
-        # their compatibility distance < δ. This value is dynamically adjusted each
+        # The compatibility threshold delta. Two genomes belong to the same species if
+        # their compatibility distance < delta. This value is dynamically adjusted each
         # generation to drive the species count toward [member target_species_count].
         var compatibility_threshold: float = 3.0
         # Target number of species. The threshold adapts to drive species count
         # toward this value.
         var target_species_count: int = 10
         # Adjustment speed when species count is ABOVE target (threshold increases).
-        # The actual adjustment is speed × (count/target)² for fast convergence.
+        # The actual adjustment is speed x (count/target)^2 for fast convergence.
         var threshold_up_speed: float = 0.3
         # Adjustment speed when species count is BELOW target (threshold decreases).
         var threshold_down_speed: float = 0.3
@@ -127,8 +127,8 @@ class Standard:
                         if sp.representative == null:
                                 sp.representative = sp.members[0]
                 # Dynamic threshold adjustment (NEAT paper):
-                # If we have more species than the target, increase δ to make speciation
-                # stricter. If fewer, decrease δ to make it more permissive.
+                # If we have more species than the target, increase delta to make speciation
+                # stricter. If fewer, decrease delta to make it more permissive.
                 # The adjustment is proportional to how far off we are, so it converges
                 # quickly rather than creeping by a fixed amount each generation.
                 var count := non_empty.size()
@@ -339,7 +339,7 @@ class Purge:
                 # Compute the ideal threshold: we want a threshold that keeps the N
                 # seed species separate but allows mutated offspring to stay with their
                 # parent species. Use the average pairwise distance between seeds as
-                # the threshold — this is large enough to absorb mutation drift while
+                # the threshold -- this is large enough to absorb mutation drift while
                 # keeping distinct seeds separate.
                 var total_dist: float = 0.0
                 var dist_count: int = 0

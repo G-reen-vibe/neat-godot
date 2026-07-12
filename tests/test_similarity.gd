@@ -39,7 +39,7 @@ func _test_disjoint() -> void:
 	var std := SimilarityTest.Standard.new()
 	var d := std.distance(a, b)
 	# 1 disjoint gene, N=1 (small genome), so d = c1*0 + c2*1 = 1.0
-	assert(absf(d - 1.0) < 0.01, "1 disjoint small genome -> d≈1.0, got %f" % d)
+	assert(absf(d - 1.0) < 0.01, "1 disjoint small genome -> dapprox1.0, got %f" % d)
 	print("  standard disjoint: OK (d=%.4f)" % d)
 
 func _test_excess() -> void:
@@ -53,8 +53,8 @@ func _test_excess() -> void:
 	b.add_connection(ConnectionGene.new(innov, extra, 3, 0.5))
 	var std := SimilarityTest.Standard.new()
 	var d := std.distance(a, b)
-	# 1 excess gene, N=1, so d ≈ 1.0
-	assert(absf(d - 1.0) < 0.01, "1 excess small genome -> d≈1.0, got %f" % d)
+	# 1 excess gene, N=1, so d approx 1.0
+	assert(absf(d - 1.0) < 0.01, "1 excess small genome -> dapprox1.0, got %f" % d)
 	print("  standard excess: OK (d=%.4f)" % d)
 
 func _test_weight_diff() -> void:
@@ -66,7 +66,7 @@ func _test_weight_diff() -> void:
 	var std := SimilarityTest.Standard.new()
 	var d := std.distance(a, b)
 	# All shared (3 conns), avg weight diff = 1.0, c3=0.4 -> 0.4 contribution.
-	assert(absf(d - 0.4) < 0.01, "Pure weight diff -> d≈0.4, got %f" % d)
+	assert(absf(d - 0.4) < 0.01, "Pure weight diff -> dapprox0.4, got %f" % d)
 	print("  standard weight_diff: OK (d=%.4f)" % d)
 
 func _test_percentage_zero_when_identical() -> void:
@@ -95,7 +95,7 @@ func _test_percentage_handles_missing() -> void:
 	# b's disjoint: w=1.0. contributes 1.0 to diff and 1.0 to total.
 	# diff = 0 (shared) + 1.0 (disjoint) = 1.0
 	# total = (|0.5|+|0.5|) + (|-0.5|+|-0.5|) + (|0.3|+|0.3|) + (|0|+|1.0|) = 1.0+1.0+0.6+1.0 = 3.6
-	# pct = 1.0 / 3.6 ≈ 0.278
+	# pct = 1.0 / 3.6 approx 0.278
 	print("  percentage missing: d=%.4f (expected ~0.278)" % d)
 	assert(d > 0.0 and d < 1.0, "Percentage should be in (0, 1) when partially similar")
 

@@ -4,7 +4,7 @@
 ## Implementations:
 ##   - [Standard]: weight uniformly sampled in [min_weight, max_weight].
 ##   - [Normal]:   weight sampled from a normal distribution.
-##   - [SafeGradient]: "Safe Mutation Through Gradients" — tentatively apply
+##   - [SafeGradient]: "Safe Mutation Through Gradients" -- tentatively apply
 ##                     the mutation, evaluate the gradient signal on a small
 ##                     perturbation, and revert if the mutation hurts the
 ##                     objective. The objective is provided by an external
@@ -76,7 +76,7 @@ class Normal:
 
 ## Safe Mutation Through Gradients (SMUG-style).
 ## We tentatively add the connection with a small initial weight, then perturb
-## the weight by ±delta and accept whichever direction keeps the network's
+## the weight by +/-delta and accept whichever direction keeps the network's
 ## output norm closer to the target (a small proxy for "useful gradient
 ## signal"). If neither direction improves, the connection is reverted.
 ##

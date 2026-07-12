@@ -30,7 +30,7 @@ func _draw() -> void:
 	var header_h: float = 28.0
 	var row_h: float = (table_h - header_h) / 4.0
 	# Title.
-	draw_string(ThemeDB.fallback_font, Vector2(table_x, pad + 20), "XOR Truth Table — Best Genome", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.9, 0.9, 0.9))
+	draw_string(ThemeDB.fallback_font, Vector2(table_x, pad + 20), "XOR Truth Table -- Best Genome", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.9, 0.9, 0.9))
 	# Header background.
 	draw_rect(Rect2(table_x, table_y, table_w, header_h), Color(0.2, 0.25, 0.35))
 	# Headers.
