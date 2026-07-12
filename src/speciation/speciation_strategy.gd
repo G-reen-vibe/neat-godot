@@ -121,12 +121,11 @@ class Standard:
 				for sp: Species in species_list:
 						if sp.members.size() > 0:
 								non_empty.append(sp)
-				# Re-elect representatives each generation from current members.
-				# This keeps representatives fresh and prevents stale representatives
-				# from trapping species counts at a fixed number.
+				# Update representatives: keep the previous representative for stability
+				# (standard NEAT practice). Only set a new one if the species is brand new.
 				for sp: Species in non_empty:
-						if sp.members.size() > 0:
-								sp.representative = sp.members[ctx.rng.randi_range(0, sp.members.size() - 1)]
+						if sp.representative == null:
+								sp.representative = sp.members[0]
 				# Dynamic threshold adjustment (NEAT paper):
 				# If we have more species than the target, increase delta to make speciation
 				# stricter. If fewer, decrease delta to make it more permissive.
