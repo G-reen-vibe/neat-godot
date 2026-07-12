@@ -137,19 +137,18 @@ func _draw() -> void:
                 _camera_offset.x = -body_x * zoom
                 center = size_vec * 0.5 + _camera_offset
         # Draw env-specific content.
-        match env.get_class():
-                "CartPoleEnvironment":
-                        _draw_cartpole(state, center, zoom, size_vec)
-                "AcrobotEnvironment":
-                        _draw_acrobot(state, center, zoom, size_vec)
-                "PongEnvironment":
-                        _draw_pong(state, center, zoom, size_vec)
-                "SpiderWalker2DEnvironment":
-                        _draw_spider_2d(state, center, zoom, size_vec)
-                "SpiderWalker3DEnvironment":
-                        _draw_spider_3d(state, center, zoom, size_vec)
-                _:
-                        draw_string(ThemeDB.fallback_font, Vector2(8, 20), "Unknown env type", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.5))
+        if env is CartPoleEnvironment:
+                _draw_cartpole(state, center, zoom, size_vec)
+        elif env is AcrobotEnvironment:
+                _draw_acrobot(state, center, zoom, size_vec)
+        elif env is PongEnvironment:
+                _draw_pong(state, center, zoom, size_vec)
+        elif env is SpiderWalker2DEnvironment:
+                _draw_spider_2d(state, center, zoom, size_vec)
+        elif env is SpiderWalker3DEnvironment:
+                _draw_spider_3d(state, center, zoom, size_vec)
+        else:
+                draw_string(ThemeDB.fallback_font, Vector2(8, 20), "Unknown env type: %s" % env.get_class(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.5))
         # Info overlay.
         draw_string(ThemeDB.fallback_font, Vector2(8, 20), _info_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.7, 0.7, 0.7))
         # Camera help.
