@@ -608,6 +608,13 @@ func _get_config_schema() -> Array:
                 {"key": "population_size", "label": "Population Size", "type": "int", "min": 10, "max": 500, "step": 10},
                 {"key": "elite_count", "label": "Elite Count", "type": "int", "min": 0, "max": 10, "step": 1},
                 {"key": "_max_generations", "label": "Max Generations", "type": "int", "min": 10, "max": 2000, "step": 10},
+                {"section": "Initialization (First Generation)"},
+                {"key": "init_min_hidden_nodes", "label": "Min Starting Hidden Nodes", "type": "int", "min": 0, "max": 10, "step": 1},
+                {"key": "init_max_hidden_nodes", "label": "Max Starting Hidden Nodes", "type": "int", "min": 0, "max": 10, "step": 1},
+                {"key": "init_min_connections", "label": "Min Starting Connections", "type": "int", "min": 1, "max": 50, "step": 1},
+                {"key": "init_max_connections", "label": "Max Starting Connections", "type": "int", "min": 1, "max": 50, "step": 1},
+                {"key": "init_weight_min", "label": "Init Weight Min", "type": "float", "min": -5.0, "max": 0.0, "step": 0.1},
+                {"key": "init_weight_max", "label": "Init Weight Max", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1},
                 {"section": "Weight Mutation"},
                 {"key": "weight_mutation_mode", "label": "Weight Mutation Mode", "type": "enum", "options": [
                         ["Single (pick N, full delta)", "single"], ["All (perturb all, small delta)", "all"]
@@ -669,11 +676,19 @@ func _get_config_schema() -> Array:
                 ]},
                 {"key": "target_species_count", "label": "Target Species Count", "type": "int", "min": 1, "max": 30, "step": 1,
                  "visible_when_any": {"speciation_method": ["standard", "purge"]}},
-                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 1.0, "max": 15.0, "step": 0.5,
+                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 0.5, "max": 20.0, "step": 0.1,
                  "visible_when": {"speciation_method": "standard"}},
-                {"key": "threshold_adjustment_speed", "label": "Threshold Adjustment Speed", "type": "float", "min": 0.05, "max": 2.0, "step": 0.05,
+                {"key": "threshold_up_speed", "label": "Threshold Up Speed (too many species)", "type": "float", "min": 0.01, "max": 5.0, "step": 0.01,
                  "visible_when": {"speciation_method": "standard"}},
-                {"key": "max_species_count", "label": "Max Species (merge above)", "type": "int", "min": 5, "max": 50, "step": 1,
+                {"key": "threshold_down_speed", "label": "Threshold Down Speed (too few species)", "type": "float", "min": 0.01, "max": 5.0, "step": 0.01,
+                 "visible_when": {"speciation_method": "standard"}},
+                {"key": "min_threshold", "label": "Min Threshold", "type": "float", "min": 0.1, "max": 5.0, "step": 0.1,
+                 "visible_when": {"speciation_method": "standard"}},
+                {"key": "max_threshold", "label": "Max Threshold", "type": "float", "min": 5.0, "max": 50.0, "step": 0.5,
+                 "visible_when": {"speciation_method": "standard"}},
+                {"key": "merge_ratio", "label": "Merge Ratio (fraction of threshold)", "type": "float", "min": 0.1, "max": 1.0, "step": 0.05,
+                 "visible_when": {"speciation_method": "standard"}},
+                {"key": "max_species_count", "label": "Max Species (hard cap)", "type": "int", "min": 5, "max": 50, "step": 1,
                  "visible_when": {"speciation_method": "standard"}},
                 {"section": "Similarity Test"},
                 {"key": "similarity_method", "label": "Similarity Test", "type": "enum", "options": [
@@ -1083,13 +1098,24 @@ func _make_config(env_idx: int) -> NeatConfig:
         var c := NeatConfig.new()
         c.use_bias = true
         c.forward_mode = "topological"
+        # Initialization: random hidden nodes (0-3) and connections (5-20).
+        c.init_min_hidden_nodes = 0
+        c.init_max_hidden_nodes = 3
+        c.init_min_connections = 5
+        c.init_max_connections = 20
+        c.init_weight_min = -1.0
+        c.init_weight_max = 1.0
         # Speciation: Purge by default. First gen keeps top N genomes as seeds,
         # then computes an ideal threshold so they stay as N stable species.
         c.speciation_method = "purge"
         c.target_species_count = 10
         c.compatibility_threshold = 3.0
-        c.threshold_adjustment_speed = 0.3
+        c.threshold_up_speed = 0.3
+        c.threshold_down_speed = 0.3
         c.max_species_count = 20
+        c.merge_ratio = 0.5
+        c.min_threshold = 0.5
+        c.max_threshold = 15.0
         # Generation: Asexual with elitism (standard NEAT).
         c.generation_method = "asexual"
         c.elite_count = 1

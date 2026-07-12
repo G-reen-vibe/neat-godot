@@ -48,9 +48,11 @@ class Standard:
         # Target number of species. The threshold adapts to drive species count
         # toward this value.
         var target_species_count: int = 10
-        # Adjustment speed: how much to add/subtract from the threshold per
-        # generation when species count is off target. (NEAT paper default: 0.3)
-        var threshold_adjustment_speed: float = 0.3
+        # Adjustment speed when species count is ABOVE target (threshold increases).
+        # The actual adjustment is speed × (count/target)² for fast convergence.
+        var threshold_up_speed: float = 0.3
+        # Adjustment speed when species count is BELOW target (threshold decreases).
+        var threshold_down_speed: float = 0.3
         # Hard cap on species count; above this, similar species are merged.
         var max_species_count: int = 20
         # Species whose representative distance is below threshold * merge_ratio
@@ -61,6 +63,14 @@ class Standard:
         var max_threshold: float = 15.0
         # Internal: next species id to allocate.
         var _next_species_id: int = 0
+
+        # Backwards-compat: generic adjustment speed sets both up and down.
+        var threshold_adjustment_speed: float:
+                get:
+                        return threshold_up_speed
+                set(v):
+                        threshold_up_speed = v
+                        threshold_down_speed = v
 
         func _init(p_threshold: float = 3.0, p_target: int = 10) -> void:
                 compatibility_threshold = p_threshold
@@ -125,10 +135,10 @@ class Standard:
                 if count > target_species_count:
                         # Adjust proportional to how far off we are (squared for faster convergence).
                         var ratio: float = float(count) / float(maxi(1, target_species_count))
-                        compatibility_threshold += threshold_adjustment_speed * ratio * ratio
+                        compatibility_threshold += threshold_up_speed * ratio * ratio
                 elif count < target_species_count:
                         var ratio: float = float(maxi(1, target_species_count)) / float(maxi(1, count))
-                        compatibility_threshold -= threshold_adjustment_speed * ratio * ratio
+                        compatibility_threshold -= threshold_down_speed * ratio * ratio
                 compatibility_threshold = clampf(compatibility_threshold, min_threshold, max_threshold)
                 # Merge if too many species (after threshold adjustment).
                 if count > target_species_count:

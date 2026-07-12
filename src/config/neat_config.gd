@@ -17,6 +17,27 @@ var output_activation: int = ActivationFunctions.Func.TANH
 var hidden_activation: int = ActivationFunctions.Func.TANH
 var initial_weight_range: float = 1.0
 
+# --- Initialization (first generation) ---
+# The initial population is built by starting from a bare input/output/bias
+# topology and applying a random sequence of connection-add and neuron-add
+# mutations to each genome independently. This produces diverse starting
+# topologies (different hidden nodes and connection patterns) so speciation
+# has meaningful structure to work with from generation 0.
+#
+# init_min_hidden_nodes / init_max_hidden_nodes: range of extra hidden nodes
+#   to add per genome (in addition to the bare inputs/outputs/bias).
+# init_min_connections / init_max_connections: range of total connections
+#   (including the initial input→output links) to aim for per genome.
+#   The actual count is clamped to the maximum feasible (all possible
+#   source→target pairs given the genome's nodes).
+# init_weight_min / init_weight_max: range for initial connection weights.
+var init_min_hidden_nodes: int = 0
+var init_max_hidden_nodes: int = 3
+var init_min_connections: int = 5
+var init_max_connections: int = 20
+var init_weight_min: float = -1.0
+var init_weight_max: float = 1.0
+
 # --- Population ---
 var population_size: int = 150
 
@@ -44,8 +65,23 @@ var compatibility_threshold: float = 3.0
 var target_species_count: int = 10
 var max_species_count: int = 20
 # How much to adjust the threshold per generation when species count is off
-# target. NEAT paper default: 0.3.
-var threshold_adjustment_speed: float = 0.3
+# target. NEAT paper default: 0.3. Separate up/down speeds for fine control:
+# threshold_up_speed applies when count > target (threshold increases);
+# threshold_down_speed applies when count < target (threshold decreases).
+var threshold_up_speed: float = 0.3
+var threshold_down_speed: float = 0.3
+# Backwards-compat: sets both up and down.
+var threshold_adjustment_speed: float:
+        get:
+                return threshold_up_speed
+        set(v):
+                threshold_up_speed = v
+                threshold_down_speed = v
+# Merge ratio: species closer than threshold × merge_ratio are merged.
+var merge_ratio: float = 0.5
+# Min/max bounds for the threshold.
+var min_threshold: float = 0.5
+var max_threshold: float = 15.0
 
 # --- Evaluation ---
 # "equal", "improvement_rate", "novelty".
@@ -146,8 +182,12 @@ func build_strategies() -> Dictionary:
                         out["speciation"] = SpeciationStrategy.Purge.new(out["mutation_policy"], null, target_species_count)
                 _:
                         var std_sp := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
-                        std_sp.threshold_adjustment_speed = threshold_adjustment_speed
+                        std_sp.threshold_up_speed = threshold_up_speed
+                        std_sp.threshold_down_speed = threshold_down_speed
                         std_sp.max_species_count = max_species_count
+                        std_sp.merge_ratio = merge_ratio
+                        std_sp.min_threshold = min_threshold
+                        std_sp.max_threshold = max_threshold
                         out["speciation"] = std_sp
         # Evaluation
         match evaluation_method:

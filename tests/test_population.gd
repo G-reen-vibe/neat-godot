@@ -28,10 +28,13 @@ func _ready() -> void:
         pop.initialize()
         print("  Initial: gen=%d, pop=%d, species=%d" % [pop.generation, pop.size(), pop.species_count()])
 
-        # Sanity check: every genome should have the expected node count.
+        # Sanity check: every genome should have at least inputs+bias+outputs.
+        # With the new random init, genomes may also have 0-3 hidden nodes and
+        # 5-20 connections, so we just check the minimum.
         for g: Genome in pop.genomes:
-                assert(g.node_count() == 3 + 1, "Initial genome should have 2 inputs + 1 bias + 1 output = 4 nodes, got %d" % g.node_count())
-                assert(g.connection_count() == 3, "Initial genome should have 3 connections (2 in + 1 bias -> 1 out), got %d" % g.connection_count())
+                assert(g.node_count() >= 3 + 1, "Initial genome should have at least 2 inputs + 1 bias + 1 output = 4 nodes, got %d" % g.node_count())
+                assert(g.connection_count() >= 1, "Initial genome should have at least 1 connection, got %d" % g.connection_count())
+                assert(not g.has_loop(), "No loops in topological mode")
 
         # Forward pass should work.
         var g0: Genome = pop.genomes[0]
