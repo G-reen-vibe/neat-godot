@@ -63,6 +63,8 @@ mass = 0.001
 gravity_scale = 0.0
 linear_damp = 0.0
 can_sleep = false
+contact_monitor = true
+max_contacts_reported = 8
 physics_material_override = SubResource("PhysMat_ball")
 
 [node name="BallShape" type="CollisionShape2D" parent="Ball"]

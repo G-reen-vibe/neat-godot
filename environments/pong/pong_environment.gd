@@ -6,7 +6,7 @@
 ##     StaticBody2D (bottom wall)
 ##     CharacterBody2D (paddle A - left, player-controlled)
 ##     CharacterBody2D (paddle B - right, opponent-controlled)
-##     RigidBody2D (ball)
+##     RigidBody2D (ball)  -- contact_monitor enabled for hit tracking
 ##     Area2D (left score zone)
 ##     Area2D (right score zone)
 ##
@@ -50,17 +50,23 @@ var _steps: int = 0
 var _done: bool = false
 var _hits_a: int = 0
 var _hits_b: int = 0
+# Forward mode used for player B's forward pass (set by env_setup_fn).
+var forward_mode: String = "topological"
 
 var _initial_ball_pos: Vector2
 var _initial_paddle_a_pos: Vector2
 var _initial_paddle_b_pos: Vector2
 var _ball_pending_reset: bool = false
 var _ball_reset_dir: float = 1.0
+var _prev_ball_vx_sign: int = 0  # for hit detection backup
 
 func _ready() -> void:
 	_initial_ball_pos = _ball.position
 	_initial_paddle_a_pos = _paddle_a.position
 	_initial_paddle_b_pos = _paddle_b.position
+	# Connect ball body_entered for hit tracking.
+	if not _ball.body_entered.is_connected(_on_ball_body_entered):
+		_ball.body_entered.connect(_on_ball_body_entered)
 
 func set_max_steps(_p: int) -> void:
 	# Pong uses its own MAX_STEPS const; ignore.
@@ -72,6 +78,9 @@ func set_player_a(g: Genome) -> void:
 func set_player_b(g: Genome) -> void:
 	player_b = g
 
+func set_forward_mode(m: String) -> void:
+	forward_mode = m
+
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
 	super.reset(p_genome, rng)
 	player_a = p_genome
@@ -82,6 +91,7 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
 	_hits_a = 0
 	_hits_b = 0
 	_ball_pending_reset = false
+	_prev_ball_vx_sign = 0
 	_paddle_a.position = _initial_paddle_a_pos
 	_paddle_a.velocity = Vector2.ZERO
 	_paddle_b.position = _initial_paddle_b_pos
@@ -96,6 +106,7 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
 		_ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, rng.randf_range(-0.8, 0.8))
 	else:
 		_ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, randf_range(-0.8, 0.8))
+	_prev_ball_vx_sign = sign(_ball.linear_velocity.x)
 
 func get_state() -> Dictionary:
 	return _build_state_dict_for_a()
@@ -140,11 +151,19 @@ func apply_action(action: Dictionary) -> void:
 	# Move paddle B (if opponent exists).
 	if player_b != null:
 		var state_b: Dictionary = _build_state_dict_for_b()
-		var output_b: Dictionary = player_b.forward(state_b, "topological")
+		var output_b: Dictionary = player_b.forward(state_b, forward_mode)
 		var b_action: float = float(output_b.get(output_node_id, 0.0))
 		_paddle_b.velocity = Vector2(0, clampf(b_action, -1.0, 1.0) * PADDLE_SPEED)
 	else:
 		_paddle_b.velocity = Vector2.ZERO
+
+func _on_ball_body_entered(body: Node) -> void:
+	if _done:
+		return
+	if body == _paddle_a:
+		_hits_a += 1
+	elif body == _paddle_b:
+		_hits_b += 1
 
 func _physics_process(_delta: float) -> void:
 	if _done:
@@ -163,6 +182,22 @@ func _physics_process(_delta: float) -> void:
 		_ball.linear_velocity = Vector2(_ball_reset_dir * BALL_SPEED * 0.7, randf_range(-0.5, 0.5))
 		_ball.angular_velocity = 0.0
 		_ball_pending_reset = false
+		_prev_ball_vx_sign = sign(_ball.linear_velocity.x)
+	# Backup hit detection: if ball vx sign flipped near a paddle, count a hit.
+	# This catches hits the body_entered signal may have missed (e.g. when the
+	# physics step is too coarse).
+	var cur_vx_sign: int = sign(_ball.linear_velocity.x)
+	if cur_vx_sign != 0 and _prev_ball_vx_sign != 0 and cur_vx_sign != _prev_ball_vx_sign:
+		var abs_vx: float = absf(_ball.linear_velocity.x)
+		# Ball is near paddle A?
+		if absf(_ball.position.x - _paddle_a.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
+			# Only count if moving away from paddle A (positive vx) and was previously moving toward (negative).
+			if cur_vx_sign > 0 and _prev_ball_vx_sign < 0:
+				_hits_a += 1
+		elif absf(_ball.position.x - _paddle_b.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
+			if cur_vx_sign < 0 and _prev_ball_vx_sign > 0:
+				_hits_b += 1
+	_prev_ball_vx_sign = cur_vx_sign
 	# Check score zones.
 	if _ball.position.x < -FIELD_WIDTH * 0.5:
 		_score_b += 1
@@ -172,6 +207,10 @@ func _physics_process(_delta: float) -> void:
 		_score_a += 1
 		_ball_pending_reset = true
 		_ball_reset_dir = -1.0
+	# Clamp ball speed (avoid runaway from bouncy physics).
+	var speed: float = _ball.linear_velocity.length()
+	if speed > BALL_SPEED * 1.5:
+		_ball.linear_velocity = _ball.linear_velocity.normalized() * BALL_SPEED * 1.5
 	# Check win condition.
 	if _score_a >= points_to_win or _score_b >= points_to_win:
 		_done = true
@@ -182,6 +221,8 @@ func is_done() -> bool:
 	return _done
 
 func current_fitness() -> float:
+	# Reward hits heavily (the main skill), reward scoring, penalize being scored on.
+	# Add small survival bonus so early generations still progress.
 	var score: float = 0.0
 	score += float(_hits_a) * 1.0
 	score += float(_score_a) * 5.0
