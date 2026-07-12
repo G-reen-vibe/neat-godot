@@ -471,7 +471,12 @@ func _get_config_value(key: String) -> Variant:
         if key.begins_with("_"):
                 return _extra.get(key)
         if _config.get(key) != null:
-                return _config.get(key)
+                var val: Variant = _config.get(key)
+                # Activation functions are stored as ints but the UI uses string names.
+                # Convert int -> string name so the OptionButton can select the right item.
+                if key.ends_with("_activation") and val is int:
+                        return ActivationFunctions.name_of(int(val))
+                return val
         return null
 
 func _on_config_changed(_val: Variant = null) -> void:
@@ -568,6 +573,9 @@ func _apply_config() -> void:
                 var val: Variant = _read_control_value_mapped(key, schema)
                 if val == null:
                         continue
+                # Activation functions: convert string name -> int.
+                if key.ends_with("_activation") and val is String:
+                        val = ActivationFunctions.from_name(val)
                 if key.begins_with("_"):
                         _extra[key] = val
                 else:
@@ -599,15 +607,21 @@ func _start_training() -> void:
         _update_run_ui()
 
 # ============================================================
-# Config schema
+# Config schema — comprehensive, covers ALL NeatConfig fields
 # ============================================================
 
 func _get_config_schema() -> Array:
         var schema: Array = [
-                {"section": "Population"},
+                # --- Population ---
+                {"section": "Population & Topology"},
                 {"key": "population_size", "label": "Population Size", "type": "int", "min": 10, "max": 500, "step": 10},
-                {"key": "elite_count", "label": "Elite Count", "type": "int", "min": 0, "max": 10, "step": 1},
-                {"key": "_max_generations", "label": "Max Generations", "type": "int", "min": 10, "max": 2000, "step": 10},
+                {"key": "elite_count", "label": "Elite Count (per species)", "type": "int", "min": 0, "max": 10, "step": 1},
+                {"key": "_max_generations", "label": "Max Generations", "type": "int", "min": 10, "max": 5000, "step": 10},
+                {"key": "use_bias", "label": "Use Bias Node", "type": "bool"},
+                {"key": "hidden_activation", "label": "Hidden Activation", "type": "enum", "options": _activation_options(), "convert": "activation"},
+                {"key": "output_activation", "label": "Output Activation", "type": "enum", "options": _activation_options(), "convert": "activation"},
+
+                # --- Initialization ---
                 {"section": "Initialization (First Generation)"},
                 {"key": "init_min_hidden_nodes", "label": "Min Starting Hidden Nodes", "type": "int", "min": 0, "max": 10, "step": 1},
                 {"key": "init_max_hidden_nodes", "label": "Max Starting Hidden Nodes", "type": "int", "min": 0, "max": 10, "step": 1},
@@ -615,128 +629,211 @@ func _get_config_schema() -> Array:
                 {"key": "init_max_connections", "label": "Max Starting Connections", "type": "int", "min": 1, "max": 50, "step": 1},
                 {"key": "init_weight_min", "label": "Init Weight Min", "type": "float", "min": -5.0, "max": 0.0, "step": 0.1},
                 {"key": "init_weight_max", "label": "Init Weight Max", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1},
+
+                # --- Forward Pass ---
+                {"section": "Forward Pass"},
+                {"key": "forward_mode", "label": "Forward Mode", "type": "enum", "options": [
+                        ["Topological (no loops, single sweep)", "topological"],
+                        ["Timestep (allows loops, iterative)", "timestep"],
+                ]},
+                {"key": "timestep_steps", "label": "Timestep Iterations", "type": "int", "min": 1, "max": 20, "step": 1,
+                 "visible_when": {"forward_mode": "timestep"}},
+                {"key": "forbid_loops", "label": "Forbid Loops (required for topological)", "type": "bool",
+                 "visible_when": {"forward_mode": "timestep"}},
+
+                # --- Mutation Policy ---
+                {"section": "Mutation Policy"},
+                {"key": "mutation_policy_method", "label": "Mutation Policy", "type": "enum", "options": [
+                        ["General (apply all enabled mutations)", "general"],
+                        ["Phased Pruning (alternate growth/pruning)", "phased_pruning"],
+                ]},
+                {"key": "mutation_stacked", "label": "Stacked (apply all in sequence)", "type": "bool",
+                 "visible_when": {"mutation_policy_method": "general"}},
+                {"key": "mutation_rate_multiplier", "label": "Global Rate Multiplier", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                 "visible_when": {"mutation_policy_method": "general"}},
+                {"key": "phased_phase_length", "label": "Phased: Phase Length (gens)", "type": "int", "min": 1, "max": 20, "step": 1,
+                 "visible_when": {"mutation_policy_method": "phased_pruning"}},
+                {"key": "phased_pruning_rate_multiplier", "label": "Phased: Pruning Rate Multiplier", "type": "float", "min": 1.0, "max": 10.0, "step": 0.5,
+                 "visible_when": {"mutation_policy_method": "phased_pruning"}},
+
+                # --- Weight Mutation ---
                 {"section": "Weight Mutation"},
+                {"key": "enable_weight_mutation", "label": "Enable Weight Mutation", "type": "bool"},
                 {"key": "weight_mutation_mode", "label": "Weight Mutation Mode", "type": "enum", "options": [
-                        ["Single (pick N, full delta)", "single"], ["All (perturb all, small delta)", "all"]
-                ]},
-                {"key": "weight_mutator_method", "label": "Weight Mutator Distribution", "type": "enum", "options": [
-                        ["Uniform (min, max)", "standard"], ["Normal (Gaussian)", "normal"]
-                ]},
-                {"key": "weight_mutation_rate", "label": "Weight Mutation Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
-                 "visible_when": {"weight_mutation_mode": "single"}},
-                {"key": "weight_mutation_min", "label": "Min Connections to Mutate", "type": "int", "min": 1, "max": 10, "step": 1,
-                 "visible_when": {"weight_mutation_mode": "single"}},
+                        ["Single (pick N connections, full delta)", "single"],
+                        ["All (perturb ALL connections, small delta)", "all"],
+                ], "visible_when": {"enable_weight_mutation": true}},
+                {"key": "weight_mutator_method", "label": "Weight Distribution", "type": "enum", "options": [
+                        ["Uniform (min, max delta)", "standard"],
+                        ["Normal (Gaussian)", "normal"],
+                ], "visible_when": {"enable_weight_mutation": true}},
+                {"key": "weight_mutation_rate", "label": "Mutation Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutation_mode": "single"}},
+                {"key": "weight_mutation_min", "label": "Min Connections to Mutate", "type": "int", "min": 1, "max": 20, "step": 1,
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutation_mode": "single"}},
                 {"key": "weight_mutation_delta_min", "label": "Delta Min (Uniform)", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
-                 "visible_when": {"weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
                 {"key": "weight_mutation_delta_max", "label": "Delta Max (Uniform)", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
-                 "visible_when": {"weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutation_mode": "single", "weight_mutator_method": "standard"}},
                 {"key": "weight_mutation_normal_std", "label": "Normal Std Dev", "type": "float", "min": 0.01, "max": 3.0, "step": 0.05,
-                 "visible_when": {"weight_mutator_method": "normal"}},
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutator_method": "normal"}},
                 {"key": "weight_mutation_all_scale", "label": "All-Mode Scale Factor", "type": "float", "min": 0.01, "max": 1.0, "step": 0.01,
-                 "visible_when": {"weight_mutation_mode": "all"}},
+                 "visible_when": {"enable_weight_mutation": true, "weight_mutation_mode": "all"}},
                 {"key": "weight_selector_method", "label": "Weight Selector", "type": "enum", "options": [
-                        ["Standard (uniform)", "standard"], ["Capped (bias to bounds)", "capped"]
-                ]},
+                        ["Standard (uniform)", "standard"],
+                        ["Capped (bias to bounds)", "capped"],
+                ], "visible_when": {"enable_weight_mutation": true}},
                 {"key": "weight_capped_min", "label": "Capped Min Weight", "type": "float", "min": -10.0, "max": 0.0, "step": 0.1,
-                 "visible_when": {"weight_selector_method": "capped"}},
+                 "visible_when": {"enable_weight_mutation": true, "weight_selector_method": "capped"}},
                 {"key": "weight_capped_max", "label": "Capped Max Weight", "type": "float", "min": 0.0, "max": 10.0, "step": 0.1,
-                 "visible_when": {"weight_selector_method": "capped"}},
-                {"section": "Structural Mutation"},
-                {"key": "connection_mutation_rate", "label": "Connection Add Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                 "visible_when": {"enable_weight_mutation": true, "weight_selector_method": "capped"}},
+
+                # --- Connection Mutation ---
+                {"section": "Connection Add Mutation"},
+                {"key": "enable_connection_mutation", "label": "Enable Connection Mutation", "type": "bool"},
+                {"key": "connection_mutation_rate", "label": "Connection Add Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.01,
+                 "visible_when": {"enable_connection_mutation": true}},
+                {"key": "connection_mutation_min", "label": "Min Connections to Add", "type": "int", "min": 0, "max": 10, "step": 1,
+                 "visible_when": {"enable_connection_mutation": true}},
                 {"key": "connection_selector_method", "label": "Connection Selector", "type": "enum", "options": [
-                        ["Standard", "standard"], ["Least Used", "least_used"], ["Least Common", "least_common"]
-                ]},
-                {"key": "connection_mutator_method", "label": "Connection Mutator", "type": "enum", "options": [
-                        ["Uniform", "standard"], ["Normal", "normal"], ["Safe Gradient", "safe_gradient"]
-                ]},
-                {"key": "connection_weight_min", "label": "New Connection Weight Min", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
-                 "visible_when": {"connection_mutator_method": "standard"}},
-                {"key": "connection_weight_max", "label": "New Connection Weight Max", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
-                 "visible_when": {"connection_mutator_method": "standard"}},
-                {"key": "neuron_mutation_rate", "label": "Neuron Add Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
+                        ["Standard (uniform)", "standard"],
+                        ["Least Used (low degree bias)", "least_used"],
+                        ["Least Common (rare innovation bias)", "least_common"],
+                ], "visible_when": {"enable_connection_mutation": true}},
+                {"key": "connection_mutator_method", "label": "Connection Weight Distribution", "type": "enum", "options": [
+                        ["Uniform (min, max)", "standard"],
+                        ["Normal (Gaussian)", "normal"],
+                        ["Safe Gradient (probe + accept)", "safe_gradient"],
+                ], "visible_when": {"enable_connection_mutation": true}},
+                {"key": "connection_weight_min", "label": "New Conn Weight Min (Uniform)", "type": "float", "min": -3.0, "max": 0.0, "step": 0.1,
+                 "visible_when": {"enable_connection_mutation": true, "connection_mutator_method": "standard"}},
+                {"key": "connection_weight_max", "label": "New Conn Weight Max (Uniform)", "type": "float", "min": 0.0, "max": 3.0, "step": 0.1,
+                 "visible_when": {"enable_connection_mutation": true, "connection_mutator_method": "standard"}},
+                {"key": "connection_weight_normal_std", "label": "New Conn Weight Std Dev (Normal)", "type": "float", "min": 0.01, "max": 3.0, "step": 0.05,
+                 "visible_when": {"enable_connection_mutation": true, "connection_mutator_method": "normal"}},
+
+                # --- Neuron Mutation ---
+                {"section": "Neuron Add Mutation"},
+                {"key": "enable_neuron_mutation", "label": "Enable Neuron Mutation", "type": "bool"},
+                {"key": "neuron_mutation_rate", "label": "Neuron Add Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.01,
+                 "visible_when": {"enable_neuron_mutation": true}},
+                {"key": "neuron_mutation_min", "label": "Min Neurons to Add", "type": "int", "min": 0, "max": 10, "step": 1,
+                 "visible_when": {"enable_neuron_mutation": true}},
                 {"key": "neuron_selector_method", "label": "Neuron Selector", "type": "enum", "options": [
-                        ["Standard", "standard"], ["Least Common", "least_common"]
-                ]},
-                {"key": "enable_mutation_rate", "label": "Enable Mutation Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05},
-                {"section": "Prune Mutation"},
+                        ["Standard (uniform)", "standard"],
+                        ["Least Common (rare split bias)", "least_common"],
+                ], "visible_when": {"enable_neuron_mutation": true}},
+
+                # --- Enable Mutation ---
+                {"section": "Enable Mutation (re-enable disabled connections)"},
+                {"key": "enable_enable_mutation", "label": "Enable Enable Mutation", "type": "bool"},
+                {"key": "enable_mutation_rate", "label": "Enable Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.01,
+                 "visible_when": {"enable_enable_mutation": true}},
+                {"key": "enable_mutation_min", "label": "Min Connections to Re-enable", "type": "int", "min": 0, "max": 10, "step": 1,
+                 "visible_when": {"enable_enable_mutation": true}},
+
+                # --- Prune Mutation ---
+                {"section": "Prune Mutation (remove connections)"},
                 {"key": "enable_prune_mutation", "label": "Enable Prune Mutation", "type": "bool"},
-                {"key": "prune_mutation_rate", "label": "Prune Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                {"key": "prune_mutation_rate", "label": "Prune Rate (prob per genome)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.01,
+                 "visible_when": {"enable_prune_mutation": true}},
+                {"key": "prune_mutation_min", "label": "Min Connections to Prune", "type": "int", "min": 0, "max": 10, "step": 1,
                  "visible_when": {"enable_prune_mutation": true}},
                 {"key": "prune_selector_method", "label": "Prune Selector", "type": "enum", "options": [
-                        ["Standard", "standard"], ["Least Weight", "least_weight"]
-                ],
-                 "visible_when": {"enable_prune_mutation": true}},
+                        ["Standard (uniform)", "standard"],
+                        ["Least Weight (small |w| bias)", "least_weight"],
+                ], "visible_when": {"enable_prune_mutation": true}},
                 {"key": "prune_mutator_method", "label": "Prune Mutator", "type": "enum", "options": [
-                        ["Disabled (any)", "disabled"], ["Non Essential", "non_essential"], ["Merge Pair", "merge"]
-                ],
-                 "visible_when": {"enable_prune_mutation": true}},
+                        ["Disabled (any connection)", "disabled"],
+                        ["Non Essential (keep outputs reachable)", "non_essential"],
+                        ["Merge Pair (collapse chain neurons)", "merge"],
+                ], "visible_when": {"enable_prune_mutation": true}},
+
+                # --- Speciation ---
                 {"section": "Speciation"},
                 {"key": "speciation_method", "label": "Speciation Method", "type": "enum", "options": [
-                        ["Single (all in one)", "single"], ["Standard (dynamic threshold)", "standard"], ["Purge (start with best N)", "purge"]
+                        ["Single (all in one species)", "single"],
+                        ["Standard (dynamic threshold)", "standard"],
+                        ["Purge (top N seeds + ideal threshold)", "purge"],
                 ]},
+                # target_species_count: visible for standard AND purge (both use it)
                 {"key": "target_species_count", "label": "Target Species Count", "type": "int", "min": 1, "max": 30, "step": 1,
                  "visible_when_any": {"speciation_method": ["standard", "purge"]}},
-                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 0.5, "max": 20.0, "step": 0.1,
-                 "visible_when": {"speciation_method": "standard"}},
+                # All threshold params: visible for standard AND purge (purge delegates to standard)
+                {"key": "compatibility_threshold", "label": "Initial Compatibility Threshold", "type": "float", "min": 0.1, "max": 20.0, "step": 0.1,
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
                 {"key": "threshold_up_speed", "label": "Threshold Up Speed (too many species)", "type": "float", "min": 0.01, "max": 5.0, "step": 0.01,
-                 "visible_when": {"speciation_method": "standard"}},
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
                 {"key": "threshold_down_speed", "label": "Threshold Down Speed (too few species)", "type": "float", "min": 0.01, "max": 5.0, "step": 0.01,
-                 "visible_when": {"speciation_method": "standard"}},
-                {"key": "min_threshold", "label": "Min Threshold", "type": "float", "min": 0.1, "max": 5.0, "step": 0.1,
-                 "visible_when": {"speciation_method": "standard"}},
-                {"key": "max_threshold", "label": "Max Threshold", "type": "float", "min": 5.0, "max": 50.0, "step": 0.5,
-                 "visible_when": {"speciation_method": "standard"}},
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
+                {"key": "min_threshold", "label": "Min Threshold Bound", "type": "float", "min": 0.1, "max": 5.0, "step": 0.1,
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
+                {"key": "max_threshold", "label": "Max Threshold Bound", "type": "float", "min": 5.0, "max": 50.0, "step": 0.5,
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
                 {"key": "merge_ratio", "label": "Merge Ratio (fraction of threshold)", "type": "float", "min": 0.1, "max": 1.0, "step": 0.05,
-                 "visible_when": {"speciation_method": "standard"}},
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
                 {"key": "max_species_count", "label": "Max Species (hard cap)", "type": "int", "min": 5, "max": 50, "step": 1,
-                 "visible_when": {"speciation_method": "standard"}},
+                 "visible_when_any": {"speciation_method": ["standard", "purge"]}},
+
+                # --- Similarity ---
                 {"section": "Similarity Test"},
                 {"key": "similarity_method", "label": "Similarity Test", "type": "enum", "options": [
-                        ["Standard (NEAT paper)", "standard"], ["Percentage", "percentage"]
+                        ["Standard (NEAT paper: E, D, W)", "standard"],
+                        ["Percentage (weight diff ratio)", "percentage"],
                 ]},
-                {"key": "similarity_c1", "label": "C1 (excess weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                {"key": "similarity_c1", "label": "C1 (excess gene weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
                  "visible_when": {"similarity_method": "standard"}},
-                {"key": "similarity_c2", "label": "C2 (disjoint weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                {"key": "similarity_c2", "label": "C2 (disjoint gene weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
                  "visible_when": {"similarity_method": "standard"}},
-                {"key": "similarity_c3", "label": "C3 (weight diff weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                {"key": "similarity_c3", "label": "C3 (weight difference weight)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
                  "visible_when": {"similarity_method": "standard"}},
-                {"section": "Generation & Evaluation"},
+                {"key": "similarity_n_threshold", "label": "N Threshold (normalize if > N genes)", "type": "int", "min": 1, "max": 100, "step": 1,
+                 "visible_when": {"similarity_method": "standard"}},
+
+                # --- Generation ---
+                {"section": "Generation & Crossover"},
                 {"key": "generation_method", "label": "Generation Method", "type": "enum", "options": [
-                        ["Asexual", "asexual"], ["Crossover", "crossover"], ["Mixed", "mixed"]
+                        ["Asexual (mutated clones)", "asexual"],
+                        ["Crossover (two parents)", "crossover"],
+                        ["Mixed (asexual + crossover)", "mixed"],
                 ]},
-                {"key": "crossover_rate", "label": "Crossover Rate", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
+                {"key": "crossover_rate", "label": "Crossover Rate (prob of crossover)", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
                  "visible_when": {"generation_method": "mixed"}},
+                # Use visible_when_any for crossover options (visible for both crossover and mixed)
                 {"key": "overall_crossover_method", "label": "Overall Crossover Strategy", "type": "enum", "options": [
-                        ["Fitter", "fitter"], ["Bigger", "bigger"], ["Combine", "combine"], ["Excluded", "excluded"]
-                ],
-                 "visible_when": {"generation_method": "crossover"}},
-                {"key": "overall_crossover_method", "label": "Overall Crossover Strategy", "type": "enum", "options": [
-                        ["Fitter", "fitter"], ["Bigger", "bigger"], ["Combine", "combine"], ["Excluded", "excluded"]
-                ],
-                 "visible_when": {"generation_method": "mixed"}},
-                {"key": "neuron_crossover_method", "label": "Neuron Crossover", "type": "enum", "options": [
-                        ["Standard", "standard"], ["Standard All", "standard_all"], ["Average", "average"], ["Biased Average", "biased_average"]
-                ],
-                 "visible_when": {"generation_method": "crossover"}},
-                {"key": "neuron_crossover_method", "label": "Neuron Crossover", "type": "enum", "options": [
-                        ["Standard", "standard"], ["Standard All", "standard_all"], ["Average", "average"], ["Biased Average", "biased_average"]
-                ],
-                 "visible_when": {"generation_method": "mixed"}},
+                        ["Fitter (inherit from fitter parent)", "fitter"],
+                        ["Bigger (inherit from bigger parent)", "bigger"],
+                        ["Combine (union of disjoints)", "combine"],
+                        ["Excluded (shared + minimal disjoints)", "excluded"],
+                ], "visible_when_any": {"generation_method": ["crossover", "mixed"]}},
+                {"key": "neuron_crossover_method", "label": "Neuron Crossover (shared conn weights)", "type": "enum", "options": [
+                        ["Standard (random pick per conn)", "standard"],
+                        ["Standard All (per-neuron parent choice)", "standard_all"],
+                        ["Average (mean of both)", "average"],
+                        ["Biased Average (toward fitter)", "biased_average"],
+                ], "visible_when_any": {"generation_method": ["crossover", "mixed"]}},
                 {"key": "biased_average_strength", "label": "Biased Average Strength", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
                  "visible_when": {"neuron_crossover_method": "biased_average"}},
                 {"key": "selection_method", "label": "Parent Selection Method", "type": "enum", "options": [
-                        ["Roulette", "roulette"], ["Inverse Roulette", "inverse_roulette"],
-                        ["Gaussian", "gaussian"], ["Triangular", "triangular"], ["Uniform", "uniform"]
+                        ["Roulette (prob ∝ fitness)", "roulette"],
+                        ["Inverse Roulette (prob ∝ 1/fitness)", "inverse_roulette"],
+                        ["Gaussian (sample N(mean,std))", "gaussian"],
+                        ["Triangular (front-loaded index)", "triangular"],
+                        ["Uniform (random)", "uniform"],
                 ]},
+                {"key": "interspecies_rate", "label": "Interspecies Mating Rate", "type": "float", "min": 0.0, "max": 0.5, "step": 0.001},
+
+                # --- Evaluation ---
+                {"section": "Evaluation Strategy"},
                 {"key": "evaluation_method", "label": "Evaluation Strategy", "type": "enum", "options": [
-                        ["Equal", "equal"], ["Improvement Rate", "improvement_rate"], ["Novelty", "novelty"]
+                        ["Equal (even split)", "equal"],
+                        ["Improvement Rate (reward improving species)", "improvement_rate"],
+                        ["Novelty (reward diverse species)", "novelty"],
                 ]},
-                {"key": "interspecies_rate", "label": "Interspecies Mating Rate", "type": "float", "min": 0.0, "max": 0.5, "step": 0.01},
-                {"section": "Forward Pass"},
-                {"key": "forward_mode", "label": "Forward Mode", "type": "enum", "options": [
-                        ["Topological (no loops)", "topological"], ["Timestep (allows loops)", "timestep"]
-                ]},
+                {"key": "novelty_weight", "label": "Novelty Weight (bonus multiplier)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
+                 "visible_when": {"evaluation_method": "novelty"}},
         ]
+        # Per-env options.
         match _env_idx:
                 0:
                         schema.append_array([
@@ -767,6 +864,25 @@ func _get_config_schema() -> Array:
                                 {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 200, "max": 2000, "step": 100},
                         ])
         return schema
+
+## Build the option list for activation function enums.
+func _activation_options() -> Array:
+        return [
+                ["Linear", "linear"],
+                ["Absolute", "abs"],
+                ["Squared", "squared"],
+                ["Cubed", "cubed"],
+                ["Binary Step", "step"],
+                ["Gaussian", "gaussian"],
+                ["Sigmoid", "sigmoid"],
+                ["Tanh", "tanh"],
+                ["ReLU", "relu"],
+                ["Leaky ReLU", "leaky_relu"],
+                ["ELU", "elu"],
+                ["SeLU", "selu"],
+                ["GELU", "gelu"],
+                ["Swish", "swish"],
+        ]
 
 # ============================================================
 # Screen 3: Training
@@ -1101,93 +1217,134 @@ func _update_run_ui() -> void:
 
 func _make_config(env_idx: int) -> NeatConfig:
         var c := NeatConfig.new()
+        # --- Topology ---
         c.use_bias = true
+        c.input_activation = ActivationFunctions.Func.LINEAR
+        c.output_activation = ActivationFunctions.Func.TANH
+        c.hidden_activation = ActivationFunctions.Func.TANH
+
+        # --- Forward pass ---
         c.forward_mode = "topological"
-        # Initialization: random hidden nodes (0-3) and connections (5-20).
+        c.timestep_steps = 5
+        c.forbid_loops = true
+
+        # --- Initialization: diverse random topologies ---
         c.init_min_hidden_nodes = 0
         c.init_max_hidden_nodes = 3
         c.init_min_connections = 5
         c.init_max_connections = 20
         c.init_weight_min = -1.0
         c.init_weight_max = 1.0
-        # Speciation: Purge by default. First gen keeps top N genomes as seeds,
-        # then computes an ideal threshold so they stay as N stable species.
+
+        # --- Speciation: Purge by default.
+        # First gen: sort by fitness, keep top N as seeds, clone+mutate to fill.
+        # Compute ideal threshold from avg pairwise distance so N species stay separate.
+        # Subsequent gens: delegate to Standard with that threshold.
         c.speciation_method = "purge"
         c.target_species_count = 10
-        c.compatibility_threshold = 3.0
-        c.threshold_up_speed = 0.3
+        c.compatibility_threshold = 3.0  # overwritten by Purge's ideal_threshold
+        c.threshold_up_speed = 0.3       # NEAT paper default
         c.threshold_down_speed = 0.3
         c.max_species_count = 20
         c.merge_ratio = 0.5
         c.min_threshold = 0.5
         c.max_threshold = 15.0
-        # Generation: Asexual with elitism (standard NEAT).
+
+        # --- Generation: Asexual with elitism (standard NEAT) ---
         c.generation_method = "asexual"
         c.elite_count = 1
         c.interspecies_rate = 0.001
         c.selection_method = "roulette"
         c.evaluation_method = "equal"
-        # Weight mutation: single mode, 80% chance, uniform delta ±0.5 (NEAT paper).
+
+        # --- Mutation policy: General (apply all enabled mutations in sequence) ---
+        c.mutation_policy_method = "general"
+        c.mutation_stacked = true
+        c.mutation_rate_multiplier = 1.0
+        c.phased_phase_length = 5
+        c.phased_pruning_rate_multiplier = 3.0
+
+        # --- Weight mutation: single mode, 80% chance, uniform delta ±0.5 ---
         c.enable_weight_mutation = true
         c.weight_mutation_mode = "single"
         c.weight_mutation_rate = 0.8
         c.weight_mutation_min = 1
         c.weight_mutation_delta_min = -0.5
         c.weight_mutation_delta_max = 0.5
+        c.weight_mutation_normal_std = 0.5
+        c.weight_mutation_all_scale = 0.1
         c.weight_mutator_method = "standard"
         c.weight_selector_method = "standard"
-        # Structural mutation: NEAT paper rates (low to avoid topological explosion).
+        c.weight_capped_min = -3.0
+        c.weight_capped_max = 3.0
+
+        # --- Connection add mutation: NEAT paper rate 5% ---
         c.enable_connection_mutation = true
         c.connection_mutation_rate = 0.05
         c.connection_mutation_min = 0
         c.connection_weight_min = -1.0
         c.connection_weight_max = 1.0
+        c.connection_weight_normal_std = 0.5
         c.connection_mutator_method = "standard"
         c.connection_selector_method = "standard"
+
+        # --- Neuron add mutation: NEAT paper rate 3% ---
         c.enable_neuron_mutation = true
         c.neuron_mutation_rate = 0.03
         c.neuron_mutation_min = 0
         c.neuron_selector_method = "standard"
+
+        # --- Enable mutation: re-enable disabled connections at 5% ---
         c.enable_enable_mutation = true
         c.enable_mutation_rate = 0.05
         c.enable_mutation_min = 0
+
+        # --- Prune mutation: off by default ---
         c.enable_prune_mutation = false
-        # Similarity: NEAT paper coefficients.
+        c.prune_mutation_rate = 0.01
+        c.prune_mutation_min = 0
+        c.prune_selector_method = "standard"
+        c.prune_mutator_method = "disabled"
+
+        # --- Similarity: NEAT paper coefficients ---
         c.similarity_method = "standard"
-        c.similarity_c1 = 1.0
-        c.similarity_c2 = 1.0
-        c.similarity_c3 = 0.4
+        c.similarity_c1 = 1.0   # excess
+        c.similarity_c2 = 1.0   # disjoint
+        c.similarity_c3 = 0.4   # weight difference
         c.similarity_n_threshold = 20
-        c.forbid_loops = true
-        # Crossover defaults (used if generation_method changes).
+
+        # --- Crossover defaults (used if generation_method changes) ---
         c.overall_crossover_method = "fitter"
         c.neuron_crossover_method = "standard"
         c.biased_average_strength = 0.5
         c.crossover_rate = 0.5
+        c.novelty_weight = 1.0
+
+        # --- Per-env topology overrides ---
         match env_idx:
                 0:
-                        # XOR: small population, sigmoid output, low threshold.
+                        # XOR: sigmoid output (0-1 range), 150 pop.
                         c.num_inputs = 2
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.SIGMOID
                         c.population_size = 150
                         c.target_species_count = 10
                 1:
-                        # CartPole: tanh output, moderate population.
+                        # CartPole: tanh output, 100 pop.
                         c.num_inputs = 4
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 100
                         c.target_species_count = 8
                 2:
-                        # Acrobot: tanh output, moderate population.
+                        # Acrobot: tanh output, 100 pop.
                         c.num_inputs = 6
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
                         c.population_size = 100
                         c.target_species_count = 8
                 3:
-                        # Pong: tanh output, smaller pop (tournament is expensive).
+                        # Pong: tanh output, 80 pop (tournament is expensive).
                         c.num_inputs = 6
                         c.num_outputs = 1
                         c.output_activation = ActivationFunctions.Func.TANH
