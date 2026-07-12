@@ -4,7 +4,7 @@
 ## lower segment connected by a knee joint. The genome controls target angles
 ## for each leg's hip (yaw + pitch) and knee.
 ##
-## Same simplified Verlet-style physics as the 2D version, but extended to 3D.
+## Physics: same foot-pinning constraint as the 2D version, but in 3D.
 ## The body moves in the XZ plane (Y is up).
 ##
 ## Inputs (16): for each of 4 legs: (touch, hip_yaw, hip_pitch, knee_angle)
@@ -22,7 +22,9 @@ const GRAVITY: float = 9.8
 const GROUND_Y: float = 0.0
 const DT: float = 0.05
 const MAX_STEPS: int = 1000
-const GROUND_FRICTION: float = 0.7
+
+var _leg_base_angles: Array[float] = [0.0, PI * 0.5, PI, PI * 1.5]  # yaw around Y
+var _standing_body_y: float = BODY_RADIUS + LEG_UPPER_LEN + LEG_LOWER_LEN
 
 # Network IO config.
 var input_node_ids: Array[int] = []
@@ -32,8 +34,6 @@ var output_node_ids: Array[int] = []
 # State.
 var _body_pos: Vector3 = Vector3.ZERO
 var _body_vel: Vector3 = Vector3.ZERO
-var _leg_base_angles: Array[float] = [0.0, PI * 0.5, PI, PI * 1.5]  # yaw around Y
-# Per-leg joint angles: hip_yaw, hip_pitch, knee.
 var _hip_yaw: Array[float] = []
 var _hip_pitch: Array[float] = []
 var _knee: Array[float] = []
@@ -41,6 +41,7 @@ var _hip_yaw_target: Array[float] = []
 var _hip_pitch_target: Array[float] = []
 var _knee_target: Array[float] = []
 var _feet_touching: Array[bool] = []
+var _prev_foot_offsets: Array = []  # Array[Vector3]
 var _steps: int = 0
 var _done: bool = false
 var _initial_pos: Vector3 = Vector3.ZERO
@@ -56,6 +57,7 @@ func _init(p_input_ids: Array[int] = [], p_bias_id: int = -1, p_output_ids: Arra
         _hip_pitch_target.resize(NUM_LEGS)
         _knee_target.resize(NUM_LEGS)
         _feet_touching.resize(NUM_LEGS)
+        _prev_foot_offsets.resize(NUM_LEGS)
         for i in range(NUM_LEGS):
                 _hip_yaw[i] = 0.0
                 _hip_pitch[i] = 0.0
@@ -64,10 +66,11 @@ func _init(p_input_ids: Array[int] = [], p_bias_id: int = -1, p_output_ids: Arra
                 _hip_pitch_target[i] = 0.0
                 _knee_target[i] = 0.0
                 _feet_touching[i] = false
+                _prev_foot_offsets[i] = Vector3.ZERO
 
 func reset(rng: RandomNumberGenerator = null) -> void:
         _body_pos = Vector3.ZERO
-        _body_pos.y = BODY_RADIUS + LEG_UPPER_LEN + LEG_LOWER_LEN
+        _body_pos.y = _standing_body_y
         _body_vel = Vector3.ZERO
         for i in range(NUM_LEGS):
                 if rng != null:
@@ -82,9 +85,23 @@ func reset(rng: RandomNumberGenerator = null) -> void:
                 _hip_pitch_target[i] = _hip_pitch[i]
                 _knee_target[i] = _knee[i]
                 _feet_touching[i] = false
+                _prev_foot_offsets[i] = _compute_foot_offset(i)
         _steps = 0
         _done = false
         _initial_pos = _body_pos
+
+func _compute_foot_offset(leg_idx: int) -> Vector3:
+        # Foot position relative to body.
+        var base: float = _leg_base_angles[leg_idx]
+        var hip_offset := Vector3(cos(base) * BODY_RADIUS, 0.0, sin(base) * BODY_RADIUS)
+        var yaw: float = base + _hip_yaw[leg_idx]
+        var pitch: float = _hip_pitch[leg_idx]
+        var upper_dir := Vector3(cos(yaw) * cos(pitch), -sin(pitch), sin(yaw) * cos(pitch)).normalized()
+        var knee_offset := hip_offset + upper_dir * LEG_UPPER_LEN
+        var lower_pitch: float = pitch + _knee[leg_idx]
+        var lower_dir := Vector3(cos(yaw) * cos(lower_pitch), -sin(lower_pitch), sin(yaw) * cos(lower_pitch)).normalized()
+        var foot_offset := knee_offset + lower_dir * LEG_LOWER_LEN
+        return foot_offset
 
 func initial_state() -> Dictionary:
         return _build_state_dict()
@@ -121,37 +138,41 @@ func step(action: Dictionary) -> Dictionary:
                 _hip_yaw[i] += clampf(_hip_yaw_target[i] - _hip_yaw[i], -0.2, 0.2)
                 _hip_pitch[i] += clampf(_hip_pitch_target[i] - _hip_pitch[i], -0.2, 0.2)
                 _knee[i] += clampf(_knee_target[i] - _knee[i], -0.2, 0.2)
-        # Compute foot positions.
-        var feet_on_ground: int = 0
-        var total_foot_force_x: float = 0.0
-        var total_foot_force_z: float = 0.0
+        var new_foot_offsets: Array = []
+        new_foot_offsets.resize(NUM_LEGS)
         for i in range(NUM_LEGS):
-                var hip_pos := _compute_hip_pos(i)
-                var knee_pos := _compute_knee_pos(i, hip_pos)
-                var foot_pos := _compute_foot_pos(i, knee_pos)
-                _feet_touching[i] = foot_pos.y <= GROUND_Y + 0.05
-                if _feet_touching[i]:
-                        feet_on_ground += 1
+                new_foot_offsets[i] = _compute_foot_offset(i)
+        var touching_threshold: float = 0.05
+        for i in range(NUM_LEGS):
+                var foot_world_y: float = _body_pos.y + (new_foot_offsets[i] as Vector3).y
+                _feet_touching[i] = foot_world_y <= GROUND_Y + touching_threshold
         # Apply gravity.
         _body_vel.y -= GRAVITY * DT
-        # Foot support.
+        # Foot-pinning.
+        var feet_on_ground: int = 0
+        var body_dx: float = 0.0
+        var body_dz: float = 0.0
+        var body_dy: float = 0.0
+        for i in range(NUM_LEGS):
+                if _feet_touching[i]:
+                        var delta_offset: Vector3 = (new_foot_offsets[i] as Vector3) - (_prev_foot_offsets[i] as Vector3)
+                        body_dx -= delta_offset.x
+                        body_dy -= delta_offset.y
+                        body_dz -= delta_offset.z
+                        feet_on_ground += 1
         if feet_on_ground > 0:
-                var support_per_foot: float = GRAVITY / float(feet_on_ground)
-                _body_vel.y += support_per_foot * DT * float(feet_on_ground)
-                for i in range(NUM_LEGS):
-                        if _feet_touching[i]:
-                                var foot_rel_vx: float = _body_vel.x
-                                var foot_rel_vz: float = _body_vel.z
-                                total_foot_force_x += -foot_rel_vx * GROUND_FRICTION
-                                total_foot_force_z += -foot_rel_vz * GROUND_FRICTION
-                _body_vel.x += total_foot_force_x * DT
-                _body_vel.z += total_foot_force_z * DT
-        # Update body position.
+                body_dx /= float(feet_on_ground)
+                body_dy /= float(feet_on_ground)
+                body_dz /= float(feet_on_ground)
+                _body_vel.x = body_dx / DT
+                _body_vel.z = body_dz / DT
+                _body_vel.y = body_dy / DT
         _body_pos += _body_vel * DT
         var min_body_y: float = BODY_RADIUS + 0.1
         if _body_pos.y < min_body_y:
                 _body_pos.y = min_body_y
                 _body_vel.y = 0.0
+        _prev_foot_offsets = new_foot_offsets.duplicate()
         if _body_pos.y < -1.0:
                 _done = true
         _steps += 1
@@ -159,43 +180,15 @@ func step(action: Dictionary) -> Dictionary:
                 _done = true
         return _build_state_dict()
 
-func _compute_hip_pos(leg_idx: int) -> Vector3:
-        var base: float = _leg_base_angles[leg_idx]
-        return Vector3(
-                _body_pos.x + cos(base) * BODY_RADIUS,
-                _body_pos.y,
-                _body_pos.z + sin(base) * BODY_RADIUS,
-        )
-
-func _compute_knee_pos(leg_idx: int, hip_pos: Vector3) -> Vector3:
-        var base: float = _leg_base_angles[leg_idx]
-        var yaw: float = base + _hip_yaw[leg_idx]
-        var pitch: float = _hip_pitch[leg_idx]
-        # Upper leg direction: in XZ plane by yaw, then downward by pitch.
-        var dir := Vector3(
-                cos(yaw) * cos(pitch),
-                -sin(pitch),
-                sin(yaw) * cos(pitch),
-        ).normalized()
-        return hip_pos + dir * LEG_UPPER_LEN
-
-func _compute_foot_pos(leg_idx: int, knee_pos: Vector3) -> Vector3:
-        var base: float = _leg_base_angles[leg_idx]
-        var yaw: float = base + _hip_yaw[leg_idx]
-        var pitch: float = _hip_pitch[leg_idx] + _knee[leg_idx]
-        var dir := Vector3(
-                cos(yaw) * cos(pitch),
-                -sin(pitch),
-                sin(yaw) * cos(pitch),
-        ).normalized()
-        return knee_pos + dir * LEG_LOWER_LEN
-
 func is_done() -> bool:
         return _done
 
 func current_fitness() -> float:
         var d := _body_pos - _initial_pos
-        return maxf(0.0, sqrt(d.x * d.x + d.z * d.z))
+        var horizontal_dist: float = sqrt(d.x * d.x + d.z * d.z)
+        # Reward forward (in +x direction) primarily, with a small bonus for any motion.
+        var forward: float = maxf(0.0, d.x)
+        return forward + 0.1 * horizontal_dist
 
 func is_solved() -> bool:
         var d := _body_pos - _initial_pos
@@ -207,10 +200,19 @@ func view_type() -> String:
 func get_visual_state() -> Dictionary:
         var feet: Array = []
         for i in range(NUM_LEGS):
-                var hip := _compute_hip_pos(i)
-                var knee := _compute_knee_pos(i, hip)
-                var foot := _compute_foot_pos(i, knee)
-                feet.append({"hip": hip, "knee": knee, "foot": foot, "touching": _feet_touching[i]})
+                var foot_offset: Vector3 = _compute_foot_offset(i)
+                var base: float = _leg_base_angles[i]
+                var hip_offset := Vector3(cos(base) * BODY_RADIUS, 0.0, sin(base) * BODY_RADIUS)
+                var yaw: float = base + _hip_yaw[i]
+                var pitch: float = _hip_pitch[i]
+                var upper_dir := Vector3(cos(yaw) * cos(pitch), -sin(pitch), sin(yaw) * cos(pitch)).normalized()
+                var knee_offset := hip_offset + upper_dir * LEG_UPPER_LEN
+                feet.append({
+                        "hip": _body_pos + hip_offset,
+                        "knee": _body_pos + knee_offset,
+                        "foot": _body_pos + foot_offset,
+                        "touching": _feet_touching[i],
+                })
         return {
                 "body_pos": _body_pos,
                 "body_vel": _body_vel,
@@ -222,5 +224,4 @@ func get_visual_state() -> Dictionary:
                 "feet": feet,
                 "distance": current_fitness(),
                 "initial_pos": _initial_pos,
-                "leg_base_angles": _leg_base_angles.duplicate(),
         }

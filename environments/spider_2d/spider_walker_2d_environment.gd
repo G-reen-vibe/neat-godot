@@ -1,14 +1,15 @@
 ## 2D Spider Walker environment.
 ##
-## A simple 2D physics creature with a body and 4 legs, each leg having an upper
+## A 2D physics creature with a body and 4 legs, each leg having an upper
 ## and lower segment connected by a knee joint. The genome controls target
 ## angles for each leg's hip and knee.
 ##
-## Physics: simple Verlet-style integration. The body has mass; each foot
-## applies a force to the body when touching the ground. Ground friction
-## translates foot forces into horizontal body motion.
+## Physics: foot-pinning constraint. When a foot is on the ground, its world
+## position is held fixed; the body moves opposite to the foot's body-frame
+## motion. This naturally produces forward locomotion when legs swing backward
+## while grounded and forward while lifted.
 ##
-## Inputs (12): for each of 4 legs: (touch_sensor, hip_angle, knee_angle, body_x_vel)
+## Inputs (12): for each of 4 legs: (touch_sensor, hip_angle, knee_angle, foot_x_body)
 ## Outputs (8): for each of 4 legs: (hip_target_delta, knee_target_delta)
 ##
 ## Fitness: horizontal distance traveled.
@@ -23,8 +24,12 @@ const GRAVITY: float = 9.8
 const GROUND_Y: float = 0.0
 const DT: float = 0.05
 const MAX_STEPS: int = 1000
-const MUSCLE_TORQUE: float = 8.0
-const GROUND_FRICTION: float = 0.7
+# Legs arranged around the body. In top-down 2D, base angles spread the legs.
+# We project to a side view for 2D: legs at base angles 0 (front), PI (back),
+# and we use 4 legs at ±0.4 rad offsets to simulate a 4-legged creature.
+var _leg_base_angles: Array[float] = [-0.6, -0.2, 0.2, 0.6]
+# Standing body height = body_radius + max_leg_reach.
+var _standing_body_y: float = BODY_RADIUS + LEG_UPPER_LEN + LEG_LOWER_LEN
 
 # Network IO config.
 var input_node_ids: Array[int] = []
@@ -32,22 +37,17 @@ var bias_node_id: int = -1
 var output_node_ids: Array[int] = []
 
 # State.
-# Body position (x, y) and velocity (vx, vy).
 var _body_x: float = 0.0
-var _body_y: float = BODY_RADIUS + LEG_UPPER_LEN + LEG_LOWER_LEN  # standing on legs
+var _body_y: float = 0.0
 var _body_vx: float = 0.0
 var _body_vy: float = 0.0
-# Per-leg state.
-# Each leg has: hip_angle (relative to body down), knee_angle (relative to upper leg).
-# Angles in radians. 0 = leg pointing straight down.
 var _hip_angles: Array[float] = []
 var _knee_angles: Array[float] = []
 var _hip_targets: Array[float] = []
 var _knee_targets: Array[float] = []
 var _feet_touching: Array[bool] = []
-# Legs are arranged at 90° intervals around the body (top-down view, body faces +x).
-# Leg base angles (in body frame, 0 = forward, +pi/2 = left).
-var _leg_base_angles: Array[float] = [0.0, PI * 0.5, PI, PI * 1.5]
+# Previous foot offsets in body frame (for computing body motion via pinning).
+var _prev_foot_offsets: Array = []  # Array[Vector2]
 var _steps: int = 0
 var _done: bool = false
 var _initial_x: float = 0.0
@@ -61,27 +61,47 @@ func _init(p_input_ids: Array[int] = [], p_bias_id: int = -1, p_output_ids: Arra
         _hip_targets.resize(NUM_LEGS)
         _knee_targets.resize(NUM_LEGS)
         _feet_touching.resize(NUM_LEGS)
+        _prev_foot_offsets.resize(NUM_LEGS)
         for i in range(NUM_LEGS):
                 _hip_angles[i] = 0.0
                 _knee_angles[i] = 0.0
                 _hip_targets[i] = 0.0
                 _knee_targets[i] = 0.0
                 _feet_touching[i] = false
+                _prev_foot_offsets[i] = Vector2.ZERO
 
 func reset(rng: RandomNumberGenerator = null) -> void:
         _body_x = 0.0
-        _body_y = BODY_RADIUS + LEG_UPPER_LEN + LEG_LOWER_LEN
+        _body_y = _standing_body_y
         _body_vx = 0.0
         _body_vy = 0.0
         for i in range(NUM_LEGS):
-                _hip_angles[i] = 0.0 if rng == null else rng.randf_range(-0.2, 0.2)
-                _knee_angles[i] = 0.0 if rng == null else rng.randf_range(-0.2, 0.2)
+                if rng != null:
+                        _hip_angles[i] = rng.randf_range(-0.2, 0.2)
+                        _knee_angles[i] = rng.randf_range(-0.2, 0.2)
+                else:
+                        _hip_angles[i] = 0.0
+                        _knee_angles[i] = 0.0
                 _hip_targets[i] = _hip_angles[i]
                 _knee_targets[i] = _knee_angles[i]
                 _feet_touching[i] = false
+                _prev_foot_offsets[i] = _compute_foot_offset(i)
         _steps = 0
         _done = false
         _initial_x = 0.0
+
+func _compute_foot_offset(leg_idx: int) -> Vector2:
+        # Returns foot position relative to body (in body frame).
+        var base: float = _leg_base_angles[leg_idx]
+        var hip_offset := Vector2(cos(base) * BODY_RADIUS, 0.0)
+        var upper_angle: float = base + _hip_angles[leg_idx]
+        # Upper leg goes from hip downward (negative y) rotated by upper_angle.
+        # hip_angle=0 means leg points straight down.
+        # In our 2D side view: leg extends from hip in direction (sin(upper_angle), -cos(upper_angle)).
+        var knee_offset := hip_offset + Vector2(sin(upper_angle), -cos(upper_angle)) * LEG_UPPER_LEN
+        var lower_angle: float = upper_angle + _knee_angles[leg_idx]
+        var foot_offset := knee_offset + Vector2(sin(lower_angle), -cos(lower_angle)) * LEG_LOWER_LEN
+        return foot_offset
 
 func initial_state() -> Dictionary:
         return _build_state_dict()
@@ -90,12 +110,8 @@ func _build_state_dict() -> Dictionary:
         var d: Dictionary = {}
         for i in range(NUM_LEGS):
                 d[input_node_ids[i * 3 + 0]] = 1.0 if _feet_touching[i] else 0.0
-                d[input_node_ids[i * 3 + 1]] = _hip_angles[i] / PI  # normalized to [-1, 1]
+                d[input_node_ids[i * 3 + 1]] = _hip_angles[i] / PI
                 d[input_node_ids[i * 3 + 2]] = _knee_angles[i] / PI
-        # Body x velocity (shared input, used as the 12th).
-        # Wait, the layout is 4 legs * 3 = 12 inputs.
-        # Let me re-derive: input_ids[0..11] = leg0(t, h, k), leg1(t, h, k), leg2(t, h, k), leg3(t, h, k)
-        # That's only 12 inputs, no body_vx. Let's keep it 12 and drop body_vx.
         return d
 
 func interpret_output(output: Dictionary) -> Dictionary:
@@ -111,63 +127,47 @@ func step(action: Dictionary) -> Dictionary:
         # Update target angles based on outputs.
         for i in range(NUM_LEGS):
                 var leg_action: Dictionary = action[i]
-                # Each output is in [-1, 1]; scale to a delta per step.
                 _hip_targets[i] += float(leg_action["hip"]) * 0.3
                 _knee_targets[i] += float(leg_action["knee"]) * 0.3
-                # Clamp targets.
                 _hip_targets[i] = clampf(_hip_targets[i], -PI * 0.5, PI * 0.5)
                 _knee_targets[i] = clampf(_knee_targets[i], -PI * 0.5, PI * 0.5)
         # Move angles toward targets (limited muscle speed).
         for i in range(NUM_LEGS):
-                var hip_diff: float = _hip_targets[i] - _hip_angles[i]
-                var knee_diff: float = _knee_targets[i] - _knee_angles[i]
-                _hip_angles[i] += clampf(hip_diff, -0.2, 0.2)
-                _knee_angles[i] += clampf(knee_diff, -0.2, 0.2)
-        # Compute foot positions and ground contact.
-        var foot_positions: Array = []
-        var total_foot_force_x: float = 0.0
-        var total_foot_force_y: float = 0.0
-        var feet_on_ground: int = 0
+                _hip_angles[i] += clampf(_hip_targets[i] - _hip_angles[i], -0.2, 0.2)
+                _knee_angles[i] += clampf(_knee_targets[i] - _knee_angles[i], -0.2, 0.2)
+        # Compute new foot offsets.
+        var new_foot_offsets: Array = []
+        new_foot_offsets.resize(NUM_LEGS)
         for i in range(NUM_LEGS):
-                # Foot position in world space.
-                var base_angle: float = _leg_base_angles[i]
-                # Hip joint position (on body surface in direction of base_angle).
-                var hip_x: float = _body_x + cos(base_angle) * BODY_RADIUS
-                var hip_y: float = _body_y + sin(base_angle) * BODY_RADIUS * 0.3  # body is circular, mostly side-to-side
-                # Upper leg end (knee): rotate from straight-down by hip_angle.
-                # In 2D side view, leg goes down from hip. hip_angle=0 = straight down.
-                # For top-down spider, this is a simplification: we project legs in 2D side view.
-                # Upper leg goes from hip in direction (sin(hip_angle+base_angle), cos(hip_angle+base_angle)).
-                var upper_angle: float = base_angle + _hip_angles[i]
-                var knee_x: float = hip_x + sin(upper_angle) * LEG_UPPER_LEN
-                var knee_y: float = hip_y - cos(upper_angle) * LEG_UPPER_LEN
-                # Lower leg: rotate by knee_angle from upper leg direction.
-                var lower_angle: float = upper_angle + _knee_angles[i]
-                var foot_x: float = knee_x + sin(lower_angle) * LEG_LOWER_LEN
-                var foot_y: float = knee_y - cos(lower_angle) * LEG_LOWER_LEN
-                foot_positions.append(Vector2(foot_x, foot_y))
-                # Ground contact.
-                _feet_touching[i] = foot_y <= GROUND_Y + 0.05
-                if _feet_touching[i]:
-                        feet_on_ground += 1
-        # Apply gravity to body.
+                new_foot_offsets[i] = _compute_foot_offset(i)
+        # Determine which feet are touching the ground (in world space).
+        # Foot world Y = body_y + foot_offset.y. Touching if <= ground + threshold.
+        var touching_threshold: float = 0.05
+        for i in range(NUM_LEGS):
+                var foot_world_y: float = _body_y + (new_foot_offsets[i] as Vector2).y
+                _feet_touching[i] = foot_world_y <= GROUND_Y + touching_threshold
+        # Apply gravity.
         _body_vy -= GRAVITY * DT
-        # Apply foot forces: each foot on ground pushes body up and (depending
-        # on horizontal motion) forward/backward.
+        # Compute body motion from feet on ground (foot-pinning).
+        var feet_on_ground: int = 0
+        var body_dx: float = 0.0
+        var body_dy: float = 0.0
+        for i in range(NUM_LEGS):
+                if _feet_touching[i]:
+                        # Foot is pinned: world position should not change.
+                        # foot_world = body + foot_offset, so Δfoot_world = Δbody + Δfoot_offset = 0.
+                        # => Δbody = -Δfoot_offset.
+                        var delta_offset: Vector2 = (new_foot_offsets[i] as Vector2) - (_prev_foot_offsets[i] as Vector2)
+                        body_dx -= delta_offset.x
+                        body_dy -= delta_offset.y
+                        feet_on_ground += 1
         if feet_on_ground > 0:
-                # Vertical: counter gravity.
-                var support_per_foot: float = GRAVITY / float(feet_on_ground)
-                _body_vy += support_per_foot * DT * float(feet_on_ground)
-                # Horizontal: feet that are moving relative to body apply friction force.
-                for i in range(NUM_LEGS):
-                        if _feet_touching[i]:
-                                # Horizontal foot velocity = body vx + tangential leg motion.
-                                # Approximate: foot moves opposite to body when leg angles change.
-                                # Friction force opposes relative motion.
-                                var foot_rel_vx: float = _body_vx  # rough: foot wants to stay (static friction)
-                                var friction: float = -foot_rel_vx * GROUND_FRICTION
-                                total_foot_force_x += friction
-                _body_vx += total_foot_force_x * DT
+                body_dx /= float(feet_on_ground)
+                body_dy /= float(feet_on_ground)
+                # Body horizontal velocity directly from feet pinning.
+                _body_vx = body_dx / DT
+                # Vertical: foot-pinning overrides gravity when feet are on ground.
+                _body_vy = body_dy / DT
         # Update body position.
         _body_x += _body_vx * DT
         _body_y += _body_vy * DT
@@ -176,7 +176,9 @@ func step(action: Dictionary) -> Dictionary:
         if _body_y < min_body_y:
                 _body_y = min_body_y
                 _body_vy = 0.0
-        # Body falls off the world = done.
+        # Save prev offsets for next step.
+        _prev_foot_offsets = new_foot_offsets.duplicate()
+        # Done conditions.
         if _body_y < -1.0:
                 _done = true
         _steps += 1
@@ -188,8 +190,11 @@ func is_done() -> bool:
         return _done
 
 func current_fitness() -> float:
-        # Distance traveled (positive forward = +x).
-        return maxf(0.0, _body_x - _initial_x)
+        # Reward forward motion primarily; small reward for any motion (so that
+        # learning can bootstrap even if the spider initially just wiggles).
+        var forward: float = _body_x - _initial_x
+        var any_motion: float = absf(forward)
+        return maxf(0.0, forward) + 0.1 * any_motion
 
 func is_solved() -> bool:
         return _body_x - _initial_x > 5.0
@@ -200,16 +205,16 @@ func view_type() -> String:
 func get_visual_state() -> Dictionary:
         var feet_pos: Array = []
         for i in range(NUM_LEGS):
-                var base_angle: float = _leg_base_angles[i]
-                var hip_x: float = _body_x + cos(base_angle) * BODY_RADIUS
-                var hip_y: float = _body_y + sin(base_angle) * BODY_RADIUS * 0.3
-                var upper_angle: float = base_angle + _hip_angles[i]
-                var knee_x: float = hip_x + sin(upper_angle) * LEG_UPPER_LEN
-                var knee_y: float = hip_y - cos(upper_angle) * LEG_UPPER_LEN
-                var lower_angle: float = upper_angle + _knee_angles[i]
-                var foot_x: float = knee_x + sin(lower_angle) * LEG_LOWER_LEN
-                var foot_y: float = knee_y - cos(lower_angle) * LEG_LOWER_LEN
-                feet_pos.append({"hip": Vector2(hip_x, hip_y), "knee": Vector2(knee_x, knee_y), "foot": Vector2(foot_x, foot_y), "touching": _feet_touching[i]})
+                var foot_offset: Vector2 = _compute_foot_offset(i)
+                var hip_offset := Vector2(cos(_leg_base_angles[i]) * BODY_RADIUS, 0.0)
+                var upper_angle: float = _leg_base_angles[i] + _hip_angles[i]
+                var knee_offset := hip_offset + Vector2(sin(upper_angle), -cos(upper_angle)) * LEG_UPPER_LEN
+                feet_pos.append({
+                        "hip": Vector2(_body_x + hip_offset.x, _body_y + hip_offset.y),
+                        "knee": Vector2(_body_x + knee_offset.x, _body_y + knee_offset.y),
+                        "foot": Vector2(_body_x + foot_offset.x, _body_y + foot_offset.y),
+                        "touching": _feet_touching[i],
+                })
         return {
                 "body_x": _body_x,
                 "body_y": _body_y,
