@@ -49,6 +49,18 @@ class Standard:
                 super(p_min_count, p_rate)
 
 
+## "All" weight selector: returns ALL enabled connections so the mutator
+## perturbs every weight by a small amount. Used when weight_mutation_mode = "all".
+class All:
+        extends WeightSelector
+
+        func _init() -> void:
+                super(0, 1.0)
+
+        func select(genome: Genome, ctx: MutationContext) -> Array:
+                return genome.enabled_connections()
+
+
 ## Capped weight selector. Biases selection toward connections whose weight is
 ## at [member min_weight] or [member max_weight], and self-adjusts the rate so
 ## that the more connections are stuck at the bounds, the more aggressive the

@@ -41,22 +41,21 @@ class Single:
 
 class Standard:
         extends SpeciationStrategy
-        # Initial compatibility threshold.
+        # The compatibility threshold δ. Two genomes belong to the same species if
+        # their compatibility distance < δ. This value is dynamically adjusted each
+        # generation to drive the species count toward [member target_species_count].
         var compatibility_threshold: float = 3.0
-        # Target species count. Threshold adapts to drive the count toward this.
+        # Target number of species. The threshold adapts to drive species count
+        # toward this value.
         var target_species_count: int = 10
+        # Adjustment speed: how much to add/subtract from the threshold per
+        # generation when species count is off target. (NEAT paper default: 0.3)
+        var threshold_adjustment_speed: float = 0.3
         # Hard cap on species count; above this, similar species are merged.
         var max_species_count: int = 20
-        # Threshold adjustment factor per generation (absolute).
-        var threshold_adjustment_factor: float = 0.1
-        # Threshold adjustment proportional factor: threshold += log(count/target) * proportional_factor
-        # This makes the adaptation much more aggressive when count >> target.
-        var threshold_proportional_factor: float = 0.3
         # Species whose representative is within this fraction of the threshold are
         # considered "too similar" and may be merged.
         var merge_ratio: float = 1.0
-        # Always merge when count > target (not just > max).
-        var merge_aggressive: bool = true
         # Min/max bounds for the threshold (prevents runaway).
         var min_threshold: float = 0.5
         var max_threshold: float = 10.0
@@ -117,21 +116,17 @@ class Standard:
                 for sp: Species in non_empty:
                         if sp.representative == null:
                                 sp.representative = sp.members[0]
-                # Adaptive threshold: drive species count toward target.
+                # Dynamic threshold adjustment (NEAT paper):
+                # If we have more species than the target, increase δ to make speciation
+                # stricter. If fewer, decrease δ to make it more permissive.
                 var count := non_empty.size()
                 if count > target_species_count:
-                        # Proportional adjustment: bigger when count >> target.
-                        var log_ratio: float = log(float(count) / float(maxi(1, target_species_count)))
-                        compatibility_threshold += threshold_adjustment_factor + log_ratio * threshold_proportional_factor
+                        compatibility_threshold += threshold_adjustment_speed
                 elif count < target_species_count:
-                        # Symmetric: bigger when count << target.
-                        var log_ratio: float = log(float(maxi(1, target_species_count)) / float(maxi(1, count)))
-                        compatibility_threshold -= threshold_adjustment_factor + log_ratio * threshold_proportional_factor
+                        compatibility_threshold -= threshold_adjustment_speed
                 compatibility_threshold = clampf(compatibility_threshold, min_threshold, max_threshold)
-                # Merge if too many species.
-                if merge_aggressive and count > target_species_count:
-                        _merge_similar(non_empty, similarity)
-                elif count > max_species_count:
+                # Merge if too many species (after threshold adjustment).
+                if count > max_species_count:
                         _merge_similar(non_empty, similarity)
                 return non_empty
 
