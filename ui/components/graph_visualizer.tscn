@@ -2,64 +2,84 @@
 
 [ext_resource type="Script" uid="uid://443pj1owrahs" path="res://ui/components/graph_visualizer.gd" id="1_gv"]
 
-[node name="GraphVisualizer" type="Panel"]
-custom_minimum_size = Vector2(360, 480)
-script = ExtResource("1_gv")
-
-[node name="VBox" type="VBoxContainer" parent="."]
-layout_mode = 1
+[node name="GraphVisualizer" type="PanelContainer"]
+custom_minimum_size = Vector2(380, 480)
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 8
-offset_top = 8
-offset_right = -8
-offset_bottom = -8
+script = ExtResource("1_gv")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SpeciesRow" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="SpeciesRow" type="HBoxContainer" parent="VBox"]
-layout_mode = 2
-
-[node name="PrevSpecies" type="Button" parent="VBox/SpeciesRow"]
-custom_minimum_size = Vector2(30, 24)
+[node name="PrevSpecies" type="Button" parent="Margin/VBox/SpeciesRow"]
+custom_minimum_size = Vector2(36, 28)
 layout_mode = 2
 text = "<"
 
-[node name="SpeciesLabel" type="Label" parent="VBox/SpeciesRow"]
+[node name="SpeciesLabel" type="Label" parent="Margin/VBox/SpeciesRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 horizontal_alignment = 1
+clip_text = true
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 13
 text = "Species -/-"
 
-[node name="NextSpecies" type="Button" parent="VBox/SpeciesRow"]
-custom_minimum_size = Vector2(30, 24)
+[node name="NextSpecies" type="Button" parent="Margin/VBox/SpeciesRow"]
+custom_minimum_size = Vector2(36, 28)
 layout_mode = 2
 text = ">"
 
-[node name="GenomeRow" type="HBoxContainer" parent="VBox"]
+[node name="GenomeRow" type="HBoxContainer" parent="Margin/VBox"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="PrevGenome" type="Button" parent="VBox/GenomeRow"]
-custom_minimum_size = Vector2(30, 24)
+[node name="PrevGenome" type="Button" parent="Margin/VBox/GenomeRow"]
+custom_minimum_size = Vector2(36, 28)
 layout_mode = 2
 text = "<"
 
-[node name="GenomeLabel" type="Label" parent="VBox/GenomeRow"]
+[node name="GenomeLabel" type="Label" parent="Margin/VBox/GenomeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 horizontal_alignment = 1
+clip_text = true
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 13
 text = "Genome -/-"
 
-[node name="NextGenome" type="Button" parent="VBox/GenomeRow"]
-custom_minimum_size = Vector2(30, 24)
+[node name="NextGenome" type="Button" parent="Margin/VBox/GenomeRow"]
+custom_minimum_size = Vector2(36, 28)
 layout_mode = 2
 text = ">"
 
-[node name="GraphView" type="Control" parent="VBox"]
-custom_minimum_size = Vector2(0, 300)
+[node name="BestBtn" type="Button" parent="Margin/VBox/GenomeRow"]
+custom_minimum_size = Vector2(50, 28)
+layout_mode = 2
+toggle_mode = true
+text = "Best"
+
+[node name="GraphViewParent" type="PanelContainer" parent="Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="StatsLabel" type="Label" parent="VBox"]
+[node name="StatsLabel" type="Label" parent="Margin/VBox"]
 layout_mode = 2
+clip_text = true
+theme_override_colors/font_color = Color(0.7, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 11
 text = ""

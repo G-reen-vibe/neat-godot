@@ -42,7 +42,7 @@ size_flags_vertical = 3
 [node name="Grid" type="GridContainer" parent="VBox/Center"]
 theme_override_constants/h_separation = 20
 theme_override_constants/v_separation = 20
-columns = 3
+columns = 2
 
 [node name="Spacer2" type="Control" parent="VBox"]
 custom_minimum_size = Vector2(0, 4)

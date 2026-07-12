@@ -36,20 +36,6 @@ const ENVS: Array = [
                 "has_viz": true,
                 "physics": true,
         },
-        {
-                "name": "Spider 2D",
-                "desc": "Walk a 4-legged creature\nforward (2D side view).",
-                "color": Color(0.7, 0.5, 0.9),
-                "has_viz": true,
-                "physics": true,
-        },
-        {
-                "name": "Spider 3D",
-                "desc": "Walk a 4-legged creature\nforward (3D top-down).",
-                "color": Color(0.5, 0.9, 0.7),
-                "has_viz": true,
-                "physics": true,
-        },
 ]
 
 @onready var _grid: GridContainer = $VBox/Center/Grid

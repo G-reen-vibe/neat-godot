@@ -7,16 +7,19 @@ var tracker: TrainingStatsTracker = null:
 		tracker = t
 		refresh()
 
-@onready var _best_label: Label = $BestFitnessLabel
-@onready var _avg_label: Label = $AvgFitnessLabel
-@onready var _species_label: Label = $SpeciesLabel
-@onready var _gen_label: Label = $GenLabel
-@onready var _history: ItemList = $HistoryList
-@onready var _graph: Control = $Graph
+@onready var _best_label: Label = $Margin/VBox/BestFitnessLabel
+@onready var _avg_label: Label = $Margin/VBox/AvgFitnessLabel
+@onready var _species_label: Label = $Margin/VBox/SpeciesLabel
+@onready var _gen_label: Label = $Margin/VBox/GenLabel
+@onready var _history: ItemList = $Margin/VBox/HistoryList
+@onready var _graph: PanelContainer = $Margin/VBox/Graph
 
 var _refresh_counter: int = 0
+var _graph_drawn: bool = false
 
 func _ready() -> void:
+	# Draw into the PanelContainer's inner area; we connect to its draw signal.
+	# PanelContainer draws its stylebox first, then our draw callback runs.
 	_graph.draw.connect(_on_graph_draw)
 
 func refresh() -> void:
@@ -40,17 +43,19 @@ func _process(_delta: float) -> void:
 			refresh()
 
 func _on_graph_draw() -> void:
-	if tracker == null or tracker.history.size() < 2:
+	if tracker == null or tracker.history.size() < 1:
 		return
 	var size_vec := _graph.get_size()
 	if size_vec.x < 2 or size_vec.y < 2:
 		return
-	# Background.
-	_graph.draw_rect(Rect2(Vector2.ZERO, size_vec), Color(0.06, 0.06, 0.1), true)
+	# Background already drawn by PanelContainer's stylebox; we draw on top.
+	# Draw a thin border.
 	_graph.draw_rect(Rect2(Vector2.ZERO, size_vec), Color(0.2, 0.2, 0.28), false, 1.0)
 	var data := tracker.best_history
 	var avg_data := tracker.avg_history
 	if data.size() < 2:
+		_graph.draw_string(ThemeDB.fallback_font, Vector2(8, size_vec.y * 0.5),
+				"Collecting data...", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.6))
 		return
 	var min_val: float = data[0]
 	var max_val: float = data[0]

@@ -1,6 +1,18 @@
-[gd_scene load_steps=2 format=3 uid="uid://brunscreen001"]
+[gd_scene load_steps=3 format=3 uid="uid://brunscreen001"]
 
 [ext_resource type="Script" uid="uid://dyokgyg8qnwfk" path="res://ui/screens/run_screen.gd" id="1_rs"]
+
+[sub_resource type="StyleBoxFlat" id="Style_viz_bg"]
+bg_color = Color(0.04, 0.04, 0.07, 1)
+border_width_left = 1
+border_width_right = 1
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.2, 0.2, 0.28, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_left = 4
+corner_radius_bottom_right = 4
 
 [node name="RunScreen" type="MarginContainer"]
 layout_mode = 3
@@ -25,83 +37,137 @@ theme_override_constants/separation = 6
 
 [node name="Header" type="HBoxContainer" parent="MainSplit/Left"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="BackBtn" type="Button" parent="MainSplit/Left/Header"]
-custom_minimum_size = Vector2(90, 32)
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
-text = "<- Menu"
+text = "Menu"
 
 [node name="ConfigBtn" type="Button" parent="MainSplit/Left/Header"]
-custom_minimum_size = Vector2(90, 32)
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
-text = "* Config"
+text = "Config"
 
 [node name="RestartBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 32)
+layout_mode = 2
+text = "Restart"
+
+[node name="RunPauseBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 32)
 layout_mode = 2
-text = "(R) Restart"
+toggle_mode = true
+text = "Run"
 
-[node name="StatsLabel" type="Label" parent="MainSplit/Left/Header"]
+[node name="SpeedLabel" type="Label" parent="MainSplit/Left/Header"]
 layout_mode = 2
-size_flags_horizontal = 3
-clip_text = true
-theme_override_colors/font_color = Color(0.8, 0.8, 0.85, 1)
-theme_override_font_sizes/font_size = 13
-text = ""
+theme_override_colors/font_color = Color(0.65, 0.65, 0.72, 1)
+theme_override_font_sizes/font_size = 12
+text = "Speed:"
 
-[node name="PauseBtn" type="Button" parent="MainSplit/Left/Header"]
-custom_minimum_size = Vector2(90, 32)
-layout_mode = 2
-text = "|| Pause"
-
-[node name="SpeedBtn" type="OptionButton" parent="MainSplit/Left/Header"]
+[node name="SpeedOption" type="OptionButton" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(70, 32)
 layout_mode = 2
-item_count = 5
+item_count = 6
 popup/item_0/text = "1x"
 popup/item_1/text = "2x"
 popup/item_2/text = "5x"
 popup/item_3/text = "10x"
-popup/item_4/text = "Max"
+popup/item_4/text = "25x"
+popup/item_5/text = "50x"
+
+[node name="StatusLabel" type="Label" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+clip_text = true
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="SolvedLabel" type="Label" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.3, 1.0, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "SOLVED!"
+
+[node name="VizToolbar" type="HBoxContainer" parent="MainSplit/Left"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="FollowBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(70, 28)
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "Follow"
+
+[node name="ZoomInBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="ZoomOutBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "-"
+
+[node name="ResetViewBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 28)
+layout_mode = 2
+text = "Reset"
 
 [node name="VizContainer" type="PanelContainer" parent="MainSplit/Left"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 clip_contents = true
+theme_override_styles/panel = SubResource("Style_viz_bg")
 
 [node name="HelpBar" type="HBoxContainer" parent="MainSplit/Left"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
 [node name="HelpText" type="Label" parent="MainSplit/Left/HelpBar"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 clip_text = true
 theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "Space=step  R=pause  N=next genome  B=best  ESC=back"
-
-[node name="SolvedLabel" type="Label" parent="MainSplit/Left/HelpBar"]
-layout_mode = 2
-horizontal_alignment = 2
-theme_override_colors/font_color = Color(0.3, 1.0, 0.3, 1)
-theme_override_font_sizes/font_size = 14
-text = ""
+text = "P/Run=pause  Space=step once  N=next genome  B=best  ESC=back"
 
 [node name="RightTabs" type="TabContainer" parent="MainSplit"]
-custom_minimum_size = Vector2(380, 0)
+unique_name_in_owner = true
+custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.42
+clip_contents = true
 
-[node name="Genome" type="PanelContainer" parent="MainSplit/RightTabs"]
+[node name="GenomeTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Stats" type="PanelContainer" parent="MainSplit/RightTabs"]
-layout_mode = 2
+[node name="StatsTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+unique_name_in_owner = true
 visible = false
-
-[node name="SaveLoad" type="PanelContainer" parent="MainSplit/RightTabs"]
 layout_mode = 2
+
+[node name="SaveLoadTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+unique_name_in_owner = true
 visible = false
+layout_mode = 2

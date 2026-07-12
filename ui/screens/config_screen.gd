@@ -397,11 +397,6 @@ func _get_config_schema() -> Array:
                                 {"key": "_points_to_win", "label": "Points to Win (per match)", "type": "int", "min": 1, "max": 11, "step": 1},
                                 {"key": "_episodes", "label": "Tournament Opponents (max 3)", "type": "int", "min": 0, "max": 3, "step": 1},
                         ])
-                4, 5:
-                        schema.append_array([
-                                {"section": "Spider Walker"},
-                                {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 200, "max": 2000, "step": 100},
-                        ])
         return schema
 
 func _activation_options() -> Array:
@@ -507,14 +502,6 @@ func _make_config(env_idx: int) -> NeatConfig:
                         c.num_inputs = 6
                         c.num_outputs = 1
                         c.population_size = 80
-                4:
-                        c.num_inputs = 12
-                        c.num_outputs = 8
-                        c.population_size = 80
-                5:
-                        c.num_inputs = 16
-                        c.num_outputs = 12
-                        c.population_size = 60
         return c
 
 func _make_extra(env_idx: int) -> Dictionary:
@@ -530,6 +517,4 @@ func _make_extra(env_idx: int) -> Dictionary:
                 3:
                         d["_points_to_win"] = 5
                         d["_episodes"] = 3
-                4: d["_max_steps"] = 1000
-                5: d["_max_steps"] = 1000
         return d

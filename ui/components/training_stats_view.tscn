@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://pjop4xhb2d48" path="res://ui/components/training_stats_view.gd" id="1_sv"]
 
 [node name="TrainingStatsView" type="VBoxContainer"]
-custom_minimum_size = Vector2(300, 400)
+custom_minimum_size = Vector2(380, 400)
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,38 +11,49 @@ anchor_bottom = 1.0
 theme_override_constants/separation = 6
 script = ExtResource("1_sv")
 
-[node name="Title" type="Label" parent="."]
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
 theme_override_font_sizes/font_size = 15
 text = "Training Stats"
 
-[node name="BestFitnessLabel" type="Label" parent="."]
+[node name="BestFitnessLabel" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Best: -"
 
-[node name="AvgFitnessLabel" type="Label" parent="."]
+[node name="AvgFitnessLabel" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Avg: -"
 
-[node name="SpeciesLabel" type="Label" parent="."]
+[node name="SpeciesLabel" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Species: -"
 
-[node name="GenLabel" type="Label" parent="."]
+[node name="GenLabel" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Gen: -"
 
-[node name="Graph" type="Control" parent="."]
-custom_minimum_size = Vector2(0, 150)
+[node name="Graph" type="PanelContainer" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="HistoryList" type="ItemList" parent="."]
-custom_minimum_size = Vector2(0, 100)
+[node name="HistoryList" type="ItemList" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_vertical = 3

@@ -1,10 +1,14 @@
 ## Visualizes a Genome's network as a directed graph. Nodes are positioned by
 ## a simple layered layout (inputs/bias left, outputs right, hidden in middle
 ## by topological depth). Connections are drawn as arrows colored by sign.
+##
+## Padding is reserved around the drawable area so node circles and arrowheads
+## never get clipped at the edges.
 extends Control
 class_name GraphView
 
-const NODE_RADIUS: float = 14.0
+const NODE_RADIUS: float = 12.0
+const PAD: float = 20.0  # padding around the drawable area
 
 var genome: Genome = null:
 	set(g):
@@ -18,6 +22,8 @@ var _rebuild_layout: bool = true
 
 func _ready() -> void:
 	_draw_layer.draw.connect(_on_draw)
+	# Re-layout when our size changes.
+	resized.connect(func(): _rebuild_layout = true)
 
 func _process(_delta: float) -> void:
 	if genome == null:
@@ -31,9 +37,14 @@ func _init_layout() -> void:
 	_positions.clear()
 	if genome == null:
 		return
-	var size := get_size()
-	if size.x < 1 or size.y < 1:
-		size = custom_minimum_size
+	var full_size := get_size()
+	if full_size.x < 1 or full_size.y < 1:
+		full_size = custom_minimum_size
+	# Reserve padding so node circles don't overflow the edges.
+	var draw_w: float = maxf(1.0, full_size.x - PAD * 2.0)
+	var draw_h: float = maxf(1.0, full_size.y - PAD * 2.0)
+	var ox: float = PAD
+	var oy: float = PAD
 	if genome.compute_topological_order():
 		pass
 	var inputs: Array = genome.input_nodes()
@@ -44,13 +55,13 @@ func _init_layout() -> void:
 	# Layer inputs/bias on the left.
 	for i in range(left_nodes.size()):
 		var n: NodeGene = left_nodes[i]
-		var y: float = (float(i) + 0.5) / float(maxi(1, left_nodes.size())) * size.y
-		_positions[n.id] = Vector2(0.12 * size.x, y)
+		var y: float = (float(i) + 0.5) / float(maxi(1, left_nodes.size())) * draw_h + oy
+		_positions[n.id] = Vector2(ox + 0.05 * draw_w, y)
 	# Layer outputs on the right.
 	for i in range(outputs.size()):
 		var n: NodeGene = outputs[i]
-		var y: float = (float(i) + 0.5) / float(maxi(1, outputs.size())) * size.y
-		_positions[n.id] = Vector2(0.88 * size.x, y)
+		var y: float = (float(i) + 0.5) / float(maxi(1, outputs.size())) * draw_h + oy
+		_positions[n.id] = Vector2(ox + 0.95 * draw_w, y)
 	# Layer hidden by topological depth in the middle.
 	var max_depth: int = 0
 	for n: NodeGene in hidden:
@@ -63,15 +74,17 @@ func _init_layout() -> void:
 		by_depth[n.depth].append(n)
 	for depth: int in by_depth:
 		var group: Array = by_depth[depth]
-		var x_frac: float = 0.3 + (0.5 * (float(depth) + 0.5) / float(maxi(1, max_depth + 1)))
+		var x_frac: float = 0.25 + (0.5 * (float(depth) + 0.5) / float(maxi(1, max_depth + 1)))
 		for i in range(group.size()):
 			var n: NodeGene = group[i]
-			var y: float = (float(i) + 0.5) / float(maxi(1, group.size())) * size.y
-			_positions[n.id] = Vector2(x_frac * size.x, y)
+			var y: float = (float(i) + 0.5) / float(maxi(1, group.size())) * draw_h + oy
+			_positions[n.id] = Vector2(ox + x_frac * draw_w, y)
 
 func _on_draw() -> void:
 	if genome == null:
 		return
+	if _positions.is_empty():
+		_init_layout()
 	# Connections.
 	for c: ConnectionGene in genome.connections.values():
 		if not _positions.has(c.from_node) or not _positions.has(c.to_node):
@@ -109,9 +122,11 @@ func _on_draw() -> void:
 
 func _draw_arrowhead(from: Vector2, to: Vector2, color: Color) -> void:
 	var dir := (to - from).normalized()
+	if dir.length_squared() < 0.001:
+		return
 	var perp := Vector2(-dir.y, dir.x)
 	var tip := to - dir * NODE_RADIUS
-	var base := tip - dir * 8.0
-	var p1 := base + perp * 4.0
-	var p2 := base - perp * 4.0
+	var base := tip - dir * 7.0
+	var p1 := base + perp * 3.5
+	var p2 := base - perp * 3.5
 	_draw_layer.draw_polygon(PackedVector2Array([tip, p1, p2]), PackedColorArray([color, color, color]))

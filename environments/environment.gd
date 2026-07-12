@@ -4,7 +4,7 @@
 ## a threaded evaluator (see [RefCountedEvaluator]). They are RefCounted so
 ## they can be created/destroyed cheaply in worker threads.
 ##
-## Physics envs (CartPole, Acrobot, Pong, Spiders) subclass
+## Physics envs (CartPole, Acrobot, Pong) subclass
 ## [NeatPhysicsEnvironment] instead, which is Node-based and stepped by the
 ## [SceneEvaluator] via the SceneTree's physics frame.
 ##
@@ -15,34 +15,34 @@ extends RefCounted
 
 ## Reset the environment to its initial state.
 func reset(rng: RandomNumberGenerator = null) -> void:
-	pass
+        pass
 
 ## Run one simulation step given the interpreted action. Returns the new state
 ## (Dictionary of input_id -> value) for the next forward pass.
 func step(action: Dictionary) -> Dictionary:
-	return {}
+        return {}
 
 ## True if the simulation has ended (e.g. pole fell, time limit reached).
 func is_done() -> bool:
-	return false
+        return false
 
 ## Current accumulated fitness for this simulation.
 func current_fitness() -> float:
-	return 0.0
+        return 0.0
 
 ## Initial state for the first forward pass (after [method reset]).
 func initial_state() -> Dictionary:
-	return {}
+        return {}
 
 ## Map the network's output (Dictionary of output_id -> activation) to an
 ## action Dictionary understood by [method step]. Default: identity.
 func interpret_output(output: Dictionary) -> Dictionary:
-	return output
+        return output
 
 ## Return a Dictionary of renderable state for visualization.
 func get_visual_state() -> Dictionary:
-	return {}
+        return {}
 
 ## Returns "2d" or "3d" to indicate which view type should render this env.
 func view_type() -> String:
-	return "2d"
+        return "2d"
