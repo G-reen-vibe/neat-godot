@@ -164,7 +164,12 @@ func _build_random_genome(input_ids: Array[int], bias_id: int, output_ids: Array
                                         continue  # outputs can't be sources
                         candidate_pairs.append(Vector2i(src, dst))
         # Shuffle and pick the first target_conns pairs.
-        candidate_pairs.shuffle()
+        # Use the Population's rng (not the global RNG) for reproducibility.
+        for i in range(candidate_pairs.size() - 1, 0, -1):
+                var j := rng.randi_range(0, i)
+                var tmp = candidate_pairs[i]
+                candidate_pairs[i] = candidate_pairs[j]
+                candidate_pairs[j] = tmp
         var n_to_add: int = mini(target_conns, candidate_pairs.size())
         for i in range(n_to_add):
                 var pair: Vector2i = candidate_pairs[i]

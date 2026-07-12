@@ -32,10 +32,18 @@ func _count_to_select(total: int, ctx: MutationContext) -> int:
 func select(genome: Genome, ctx: MutationContext) -> Array:
         var enabled := genome.enabled_connections()
         var n := _count_to_select(enabled.size(), ctx)
-        enabled.shuffle()
+        _shuffle_with_rng(enabled, ctx.rng)
         if n < enabled.size():
                 enabled.resize(n)
         return enabled
+
+# Fisher-Yates shuffle using a specific RNG (for reproducibility).
+static func _shuffle_with_rng(arr: Array, rng: RandomNumberGenerator) -> void:
+        for i in range(arr.size() - 1, 0, -1):
+                var j := rng.randi_range(0, i)
+                var tmp = arr[i]
+                arr[i] = arr[j]
+                arr[j] = tmp
 
 
 class Standard:
