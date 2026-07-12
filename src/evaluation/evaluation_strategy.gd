@@ -108,7 +108,9 @@ class ImprovementRate:
                 for i in range(species_list.size()):
                         var sp: Species = species_list[i]
                         var cur_avg: float = sp.average_fitness
-                        var prev_avg: float = sp.best_fitness_history[-2] if sp.best_fitness_history.size() >= 2 else cur_avg
+                        # Compare current AVERAGE to previous AVERAGE (not best) for a
+                        # fair improvement-rate calculation.
+                        var prev_avg: float = sp.average_fitness_history[-2] if sp.average_fitness_history.size() >= 2 else cur_avg
                         var improvement: float = (cur_avg - prev_avg) / (absf(prev_avg) + 1e-6)
                         scores[i] = maxf(0.0, cur_avg) * (1.0 + maxf(0.0, improvement))
                         # Mutation rate: low improvement -> higher mutation.
