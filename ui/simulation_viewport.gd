@@ -23,6 +23,12 @@ var population: Population = null:
                 population = p
                 _rebuild_views()
 
+# Optional: tournament opponents for Pong live viz. If set, the top-view Pong
+# sim will use opponents[0] as player B instead of a static paddle.
+var opponents: Array = []:
+        set(o):
+                opponents = o
+
 var env_factory: Callable = Callable()
 var forward_mode: String = "topological"
 
@@ -227,10 +233,15 @@ func _init_parallel_sims() -> void:
         local_rng.seed = 12345
         for i in range(n):
                 var env: NeatEnvironment = env_factory.call()
-                # Pong envs need a player A set.
+                # Pong envs need player A and B set.
                 if env is PongEnvironment:
-                        (env as PongEnvironment).set_player_a(population.genomes[i])
-                        (env as PongEnvironment).set_player_b(null)  # static opponent
+                        var pe: PongEnvironment = env as PongEnvironment
+                        pe.set_player_a(population.genomes[i])
+                        # Use tournament opponent if available; else static.
+                        if opponents.size() > 0 and opponents[0] != null:
+                                pe.set_player_b(opponents[0])
+                        else:
+                                pe.set_player_b(null)
                 env.reset(local_rng)
                 _live_envs.append(env)
                 _live_genomes.append(population.genomes[i])
@@ -253,13 +264,13 @@ func _step_parallel_sims() -> void:
                         continue
                 var g: Genome = _live_genomes[i]
                 var env: NeatEnvironment = _live_envs[i]
-                # Pong special: needs two players. We use a static opponent for the
-                # live visualization (the live sim is for visualization only; actual
-                # tournament evaluation happens in the main runner).
                 if env is PongEnvironment:
                         var pong_env: PongEnvironment = env as PongEnvironment
                         var output_a: Dictionary = g.forward(_live_states[i], forward_mode)
-                        var action: Dictionary = pong_env.interpret_output(output_a, {})
+                        var output_b: Dictionary = {}
+                        if pong_env.player_b != null:
+                                output_b = pong_env.player_b.forward(_live_states[i], forward_mode)
+                        var action: Dictionary = pong_env.interpret_output(output_a, output_b)
                         _live_states[i] = pong_env.step(action)
                 else:
                         var output: Dictionary = g.forward(_live_states[i], forward_mode)
@@ -276,10 +287,15 @@ func _reset_top_sim() -> void:
         _top_genome_idx = _top_genome_idx % population.genomes.size()
         _top_genome = population.genomes[_top_genome_idx]
         _top_env = env_factory.call()
-        # Pong envs need a player A set.
+        # Pong envs need player A and player B set.
         if _top_env is PongEnvironment:
-                (_top_env as PongEnvironment).set_player_a(_top_genome)
-                (_top_env as PongEnvironment).set_player_b(null)  # static opponent for visualization
+                var pe: PongEnvironment = _top_env as PongEnvironment
+                pe.set_player_a(_top_genome)
+                # Use a tournament opponent if available; otherwise static.
+                if opponents.size() > 0 and opponents[0] != null:
+                        pe.set_player_b(opponents[0])
+                else:
+                        pe.set_player_b(null)
         var local_rng := RandomNumberGenerator.new()
         local_rng.seed = 999
         _top_env.reset(local_rng)
@@ -300,7 +316,10 @@ func _step_top_sim() -> void:
         if _top_env is PongEnvironment:
                 var pong_env: PongEnvironment = _top_env as PongEnvironment
                 var output_a: Dictionary = _top_genome.forward(_top_state, forward_mode)
-                var action: Dictionary = pong_env.interpret_output(output_a, {})
+                var output_b: Dictionary = {}
+                if pong_env.player_b != null:
+                        output_b = pong_env.player_b.forward(_top_state, forward_mode)
+                var action: Dictionary = pong_env.interpret_output(output_a, output_b)
                 _top_state = pong_env.step(action)
         else:
                 var output: Dictionary = _top_genome.forward(_top_state, forward_mode)
