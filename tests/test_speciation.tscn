@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestspec0001"]
+
+[ext_resource type="Script" path="res://tests/test_speciation.gd" id="1_spec"]
+
+[node name="TestSpeciation" type="Node"]
+script = ExtResource("1_spec")
