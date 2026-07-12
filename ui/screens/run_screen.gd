@@ -153,6 +153,8 @@ func _setup_visualization() -> void:
                 _follow_btn.button_pressed = _env_viewport.is_auto_follow()
 
 func _setup_evaluator() -> void:
+        # Dispose any previous evaluator (frees its SubViewports).
+        _dispose_evaluator()
         if _env_idx == 0:
                 _evaluator = Evaluator.new(Callable(self, "_make_xor_env"), 100, "topological")
                 _evaluator.episodes_per_genome = 1
@@ -165,6 +167,17 @@ func _setup_evaluator() -> void:
                 _evaluator.speedup = speedup
                 _evaluator.episodes_per_genome = int(_extra.get("_episodes", 1))
                 _evaluator.env_setup_fn = _make_env_setup_fn()
+
+func _dispose_evaluator() -> void:
+        if _evaluator == null:
+                return
+        if _evaluator is SceneEvaluator and is_instance_valid(_evaluator):
+                (_evaluator as SceneEvaluator).dispose()
+        _evaluator = null
+
+func _exit_tree() -> void:
+        # Clean up the evaluator when the RunScreen is freed.
+        _dispose_evaluator()
 
 func _make_xor_env() -> XorEnvironment:
         return XorEnvironment.new([0, 1], 2, 3)
@@ -206,6 +219,12 @@ func _toggle_pause() -> void:
         _auto_run = not _auto_run
         _run_pause_btn.text = "Pause" if _auto_run else "Run"
         _run_pause_btn.button_pressed = _auto_run
+
+## Stop training immediately (used before restart / leaving the screen).
+func request_stop() -> void:
+        _auto_run = false
+        _run_pause_btn.text = "Run"
+        _run_pause_btn.button_pressed = false
 
 func _input(event: InputEvent) -> void:
         if not (event is InputEventKey and event.pressed):
