@@ -95,6 +95,8 @@ func evaluate_all(genomes: Array) -> Array[float]:
         var out: Array[float] = []
         out.resize(genomes.size())
         out.fill(0.0)
+        # Apply speedup once for the whole evaluation.
+        _begin_speedup()
         # Run in batches of num_slots.
         var idx: int = 0
         while idx < genomes.size():
@@ -103,6 +105,8 @@ func evaluate_all(genomes: Array) -> Array[float]:
                 for i in range(batch_size):
                         out[idx + i] = batch_fitnesses[i]
                 idx += batch_size
+        # Restore engine settings.
+        _end_speedup()
         return out
 
 ## Evaluate [param batch_size] genomes starting at [param start_idx] in parallel.
@@ -110,8 +114,6 @@ func _evaluate_batch(genomes: Array, start_idx: int, batch_size: int) -> Array[f
         var out: Array[float] = []
         out.resize(batch_size)
         out.fill(0.0)
-        # Begin speedup.
-        _begin_speedup()
         # Run episodes.
         var num_episodes: int = maxi(1, episodes_per_genome)
         for ep in range(num_episodes):
@@ -159,8 +161,6 @@ func _evaluate_batch(genomes: Array, start_idx: int, batch_size: int) -> Array[f
         # Average over episodes.
         for i in range(batch_size):
                 out[i] /= float(num_episodes)
-        # End speedup.
-        _end_speedup()
         return out
 
 func _begin_speedup() -> void:

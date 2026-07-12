@@ -35,13 +35,13 @@ bounce = 0.0
 script = ExtResource("1_sp3")
 
 [node name="Ground" type="StaticBody3D" parent="."]
-position = Vector3(0, 0.3, 0)
+position = Vector3(0, -0.25, 0)
 
 [node name="GroundShape" type="CollisionShape3D" parent="Ground"]
 shape = SubResource("Shape_ground")
 
 [node name="Body" type="RigidBody3D" parent="."]
-position = Vector3(0, -1.0, 0)
+position = Vector3(0, 1.5, 0)
 mass = 4.0
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -53,7 +53,7 @@ physics_material_override = SubResource("PhysMat_body")
 shape = SubResource("Shape_body")
 
 [node name="UpperLeg0" type="RigidBody3D" parent="."]
-position = Vector3(0.4, -0.85, 0)
+position = Vector3(0.4, 1.2, 0)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -65,7 +65,7 @@ physics_material_override = SubResource("PhysMat_leg")
 shape = SubResource("Shape_upper")
 
 [node name="LowerLeg0" type="RigidBody3D" parent="."]
-position = Vector3(0.5, -0.5, 0)
+position = Vector3(0.5, 0.8, 0)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -93,7 +93,7 @@ node_a = NodePath("../UpperLeg0")
 node_b = NodePath("../LowerLeg0")
 
 [node name="UpperLeg1" type="RigidBody3D" parent="."]
-position = Vector3(0, -0.85, 0.4)
+position = Vector3(0, 1.2, 0.4)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -105,7 +105,7 @@ physics_material_override = SubResource("PhysMat_leg")
 shape = SubResource("Shape_upper")
 
 [node name="LowerLeg1" type="RigidBody3D" parent="."]
-position = Vector3(0, -0.5, 0.5)
+position = Vector3(0, 0.8, 0.5)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -133,7 +133,7 @@ node_a = NodePath("../UpperLeg1")
 node_b = NodePath("../LowerLeg1")
 
 [node name="UpperLeg2" type="RigidBody3D" parent="."]
-position = Vector3(-0.4, -0.85, 0)
+position = Vector3(-0.4, 1.2, 0)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -145,7 +145,7 @@ physics_material_override = SubResource("PhysMat_leg")
 shape = SubResource("Shape_upper")
 
 [node name="LowerLeg2" type="RigidBody3D" parent="."]
-position = Vector3(-0.5, -0.5, 0)
+position = Vector3(-0.5, 0.8, 0)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -173,7 +173,7 @@ node_a = NodePath("../UpperLeg2")
 node_b = NodePath("../LowerLeg2")
 
 [node name="UpperLeg3" type="RigidBody3D" parent="."]
-position = Vector3(0, -0.85, -0.4)
+position = Vector3(0, 1.2, -0.4)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
@@ -185,7 +185,7 @@ physics_material_override = SubResource("PhysMat_leg")
 shape = SubResource("Shape_upper")
 
 [node name="LowerLeg3" type="RigidBody3D" parent="."]
-position = Vector3(0, -0.5, -0.5)
+position = Vector3(0, 0.8, -0.5)
 mass = 0.3
 gravity_scale = 1.0
 linear_damp = 0.1
