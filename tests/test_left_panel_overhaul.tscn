@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestleftpanel001"]
+
+[ext_resource type="Script" path="res://tests/test_left_panel_overhaul.gd" id="1_lp"]
+
+[node name="TestLeftPanel" type="Node"]
+script = ExtResource("1_lp")
