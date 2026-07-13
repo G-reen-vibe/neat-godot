@@ -27,7 +27,8 @@ const COL_CHART_GRID := Color(0.18, 0.18, 0.24, 0.5)
 var tracker: TrainingStatsTracker = null:
         set(t):
                 tracker = t
-                refresh()
+                if is_node_ready():
+                        refresh()
 
 @onready var _scroll: ScrollContainer = $ScrollContainer
 # Overview
@@ -65,6 +66,9 @@ var _refresh_counter: int = 0
 func _ready() -> void:
         _fitness_chart.draw.connect(_on_fitness_chart_draw)
         _threshold_chart.draw.connect(_on_threshold_chart_draw)
+        # If tracker was set before _ready(), refresh now that @onready vars exist.
+        if tracker != null:
+                refresh()
 
 func refresh() -> void:
         if tracker == null:

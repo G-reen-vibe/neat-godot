@@ -31,7 +31,9 @@ var population: Population = null:
                 _show_best = false
                 if is_node_ready():
                         _best_btn.set_pressed_no_signal(false)
-                _refresh()
+                        _refresh()
+                # If not ready yet, _refresh() will be called from _ready() via the
+                # initial @onready setup. The @onready vars are null before _ready().
 
 var _current_species_idx: int = 0
 var _current_genome_idx: int = 0
@@ -66,6 +68,9 @@ func _ready() -> void:
         _best_btn.pressed.connect(_on_best_pressed)
         _species_dropdown.item_selected.connect(_on_species_dropdown_selected)
         _genome_dropdown.item_selected.connect(_on_genome_dropdown_selected)
+        # If population was set before _ready(), refresh now that @onready vars exist.
+        if population != null:
+                _refresh()
 
 # --- Species navigation ---
 
