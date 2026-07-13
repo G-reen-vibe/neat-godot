@@ -262,17 +262,19 @@ func _on_speed_up() -> void:
 
 ## Freeze/unfreeze the live env's physics bodies. When frozen, the bodies
 ## won't move even when the SceneEvaluator steps the SceneTree's physics.
-## This is the ONLY reliable way to prevent the live env from being affected
-## by training — set_physics_process(false) only stops the script's
-## _physics_process, not the physics server from stepping the bodies.
+## The live env's _physics_process is ALWAYS disabled — _drive_live_env is
+## the sole driver (it calls step_env() explicitly). This prevents the
+## double-driving that caused two-cart bugs and flickering.
 func _set_live_env_frozen(frozen: bool) -> void:
         if _live_env == null or not is_instance_valid(_live_env):
                 return
         if _live_env.has_method("set_bodies_frozen"):
                 _live_env.set_bodies_frozen(frozen)
-        # Also disable the env's _physics_process when frozen so it doesn't
-        # increment _steps or check is_done.
-        _live_env.set_physics_process(not frozen)
+        # NEVER enable the live env's _physics_process. _drive_live_env calls
+        # step_env() explicitly, so the env's own _physics_process would
+        # double-drive it (incrementing _steps twice, checking done twice,
+        # resetting while _drive_live_env also resets, etc.).
+        _live_env.set_physics_process(false)
 
 # --- Live genome selection (N / B keys) ---
 
@@ -384,6 +386,9 @@ func _physics_process(_delta: float) -> void:
 
 ## Drive the live visualization env with the live genome. This is purely for
 ## display; it does NOT affect fitness (which is computed by the evaluator).
+## This is the SOLE driver of the live env — the env's own _physics_process
+## is permanently disabled. We call step_env() (game logic) + apply_action()
+## (genome's action) each physics tick.
 func _drive_live_env() -> void:
         if _env_viewport == null or not is_instance_valid(_env_viewport):
                 return
@@ -399,6 +404,15 @@ func _drive_live_env() -> void:
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
                 _env_viewport.reset_env(g, rng)
+                return
+        # Step the env's game logic (increment steps, check done, handle ball
+        # reset, etc.). This replaces the env's _physics_process which is
+        # permanently disabled for the live env.
+        if _live_env.has_method("step_env"):
+                _live_env.step_env()
+        # Check done again after stepping — if the env became done this tick,
+        # reset it next tick (the is_done check above handles it).
+        if _live_env.has_method("is_done") and _live_env.is_done():
                 return
         # Apply live genome's action.
         var state: Dictionary = _live_env.get_state()
@@ -432,9 +446,10 @@ func _step_generation() -> void:
         if _stats_tracker != null:
                 _stats_tracker.record(_pop)
         _pop.evolve()
-        # After evolution, the live_idx may be stale (new genomes). Reset to best.
-        _live_is_best = true
-        _live_idx = -1
+        # Note: we do NOT reset _live_is_best / _live_idx here. N/B selections
+        # persist across generations. The live genome may be stale (new genomes
+        # after evolve), but _live_genome() handles out-of-range indices by
+        # falling back to best_genome.
 
 func _update_ui() -> void:
         if _pop == null:

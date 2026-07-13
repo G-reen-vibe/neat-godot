@@ -114,7 +114,11 @@ func apply_action(action: Dictionary) -> void:
 func is_done() -> bool:
         return _done
 
-func _physics_process(_delta: float) -> void:
+## Step the env's game logic (increment steps, check done conditions). This is
+## called from _physics_process (for training envs) AND from the RunScreen's
+## _drive_live_env (for the live env). Having it as a separate method lets the
+## live env be driven by _drive_live_env without its own _physics_process running.
+func step_env() -> void:
         if _done:
                 return
         _steps += 1
@@ -131,6 +135,9 @@ func _physics_process(_delta: float) -> void:
                 _pole.sleeping = true
         elif _steps >= _max_steps:
                 _done = true
+
+func _physics_process(_delta: float) -> void:
+        step_env()
 
 func current_fitness() -> float:
         return float(_steps)

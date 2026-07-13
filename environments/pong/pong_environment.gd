@@ -178,7 +178,13 @@ func _on_ball_body_entered(body: Node) -> void:
         elif body == _paddle_b:
                 _hits_b += 1
 
-func _physics_process(_delta: float) -> void:
+func is_done() -> bool:
+        return _done
+
+## Step the env's game logic. Called from _physics_process (training) AND
+## from RunScreen._drive_live_env (live env). See CartPoleEnvironment.step_env
+## for rationale.
+func step_env() -> void:
         if _done:
                 return
         _steps += 1
@@ -221,8 +227,8 @@ func _physics_process(_delta: float) -> void:
         elif _steps >= _max_steps:
                 _done = true
 
-func is_done() -> bool:
-        return _done
+func _physics_process(_delta: float) -> void:
+        step_env()
 
 func current_fitness() -> float:
         # Reward hits heavily (the main skill), reward scoring, penalize being scored on.

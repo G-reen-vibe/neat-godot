@@ -110,23 +110,19 @@ func apply_action(action: Dictionary) -> void:
 func is_done() -> bool:
         return _done
 
-func _physics_process(_delta: float) -> void:
+## Step the env's game logic. Called from _physics_process (training) AND
+## from RunScreen._drive_live_env (live env). See CartPoleEnvironment.step_env
+## for rationale.
+func step_env() -> void:
         if _done:
                 return
         _steps += 1
         # Clip angular velocities.
         _link1.angular_velocity = clampf(_link1.angular_velocity, -MAX_VEL_1, MAX_VEL_1)
         _link2.angular_velocity = clampf(_link2.angular_velocity, -MAX_VEL_2, MAX_VEL_2)
-        # Compute tip y. theta1=0 means link1 hangs straight down (-y in Godot).
-        # Link1's tip (bottom) is at: anchor_pos + (sin(theta1), cos(theta1)) * L1
-        # Link2's tip is at: link1_tip + (sin(theta1+theta2), cos(theta1+theta2)) * L2
-        # In Godot +y is DOWN, so "above the anchor" means tip y < anchor y.
-        # Tip y (world) = anchor_y + cos(theta1)*L1 + cos(theta1+theta2)*L2 (both positive when hanging down).
-        # "Height above anchor" = -(tip_y - anchor_y) = -cos(theta1)*L1 - cos(theta1+theta2)*L2.
         var theta1: float = _link1.rotation
         var theta2: float = _link2.rotation - _link1.rotation
         var tip_y_world: float = position.y + cos(theta1) * LINK_LENGTH_1 + cos(theta1 + theta2) * LINK_LENGTH_2
-        # Height above anchor (positive = above).
         var height_above: float = position.y - tip_y_world
         if height_above > _max_tip_y:
                 _max_tip_y = height_above
@@ -134,6 +130,9 @@ func _physics_process(_delta: float) -> void:
                 _done = true
         elif _steps >= _max_steps:
                 _done = true
+
+func _physics_process(_delta: float) -> void:
+        step_env()
 
 func current_fitness() -> float:
         var step_component: float = float(_max_steps - _steps) / float(_max_steps)

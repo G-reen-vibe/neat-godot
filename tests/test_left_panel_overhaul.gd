@@ -115,20 +115,34 @@ func _ready() -> void:
         speed_option.selected = 1
         speed_option.item_selected.emit(1)
         await get_tree().process_frame
-        # --- Test 4: Speed=Pause halts training ---
-        # CartPole with max_steps=500 needs ~500 physics frames per generation.
+        # --- Test 4: Training advances at 1x ---
+        # Wait for any in-flight _step_budget to complete, then verify training advances.
+        # CartPole with max_steps=500 needs ~500 physics frames per generation, but
+        # most genomes die early (~10-50 steps), so a generation completes in ~100 frames.
         var gen_before: int = run_screen.get_population().generation
-        for i in range(800):
+        var gen_after_run: int = gen_before
+        for i in range(2000):
                 await get_tree().process_frame
-        var gen_after_run: int = run_screen.get_population().generation
+                gen_after_run = run_screen.get_population().generation
+                if gen_after_run > gen_before:
+                        break
         if gen_after_run <= gen_before:
                 _fail("Training didn't advance at 1x: before=%d after=%d" % [gen_before, gen_after_run])
+        if not _failed:
+                print("  [OK] Training advances at 1x (gen %d -> %d)" % [gen_before, gen_after_run])
+        # Let it train a bit more so we have a meaningful gen_at_pause.
+        for i in range(600):
+                await get_tree().process_frame
         # Pause.
         speed_option.selected = 0
         speed_option.item_selected.emit(0)
-        for i in range(120):
+        # Wait for in-flight generation to complete.
+        for i in range(2000):
                 await get_tree().process_frame
+                if not run_screen._stepping:
+                        break
         var gen_at_pause: int = run_screen.get_population().generation
+        # Wait another 60 frames and verify no advancement.
         for i in range(60):
                 await get_tree().process_frame
         var gen_after_pause: int = run_screen.get_population().generation
@@ -140,9 +154,13 @@ func _ready() -> void:
         var gen_before_resume: int = run_screen.get_population().generation
         speed_option.selected = 1
         speed_option.item_selected.emit(1)
-        for i in range(800):
+        # Wait for training to advance after resume.
+        var gen_after_resume: int = gen_before_resume
+        for i in range(2000):
                 await get_tree().process_frame
-        var gen_after_resume: int = run_screen.get_population().generation
+                gen_after_resume = run_screen.get_population().generation
+                if gen_after_resume > gen_before_resume:
+                        break
         if gen_after_resume <= gen_before_resume:
                 _fail("Training didn't resume after unpausing: before=%d after=%d" % [gen_before_resume, gen_after_resume])
         if not _failed:
