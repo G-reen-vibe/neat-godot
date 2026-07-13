@@ -110,6 +110,10 @@ func _evaluate_batch(genomes: Array, start_idx: int, batch_size: int) -> Array[f
                         var rng := RandomNumberGenerator.new()
                         rng.seed = (start_idx + i) * 7919 + ep * 31 + 1
                         env.reset(genomes[start_idx + i], rng)
+                # Yield one physics frame so the teleport (queued by reset) applies
+                # before the first action. Without this, the first action's impulse
+                # is cleared by the teleport's velocity override in _integrate_forces.
+                await _host.get_tree().physics_frame
                 # Step loop: apply action, yield physics frame, check done.
                 var done: Array[bool] = []
                 done.resize(batch_size)
