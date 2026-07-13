@@ -100,7 +100,8 @@ func _test_cartpole_live_drive() -> void:
                 await _wait_frames(5)
                 var steps_after_reset: int = env.get_visual_state()["steps"]
                 _assert(steps_after_reset < 10, "CartPole live: should auto-reset after done, steps=%d" % steps_after_reset)
-                print("    auto-reset OK, steps after done+5 frames: %d" % steps_after_reset)
+                _assert(env.live_episode_count >= 1, "CartPole live: episode count should increment after auto-reset, got %d" % env.live_episode_count)
+                print("    auto-reset OK, steps after done+5 frames: %d, episode=%d" % [steps_after_reset, env.live_episode_count])
         # Test N/B: switch genome.
         var g2: Genome = _make_genome(4, 1)
         env.set_live_genome(g2)
@@ -208,9 +209,10 @@ func _test_pong_live_drive() -> void:
                 var steps2: int = int(state2["steps"])
                 var score_a2: int = int(state2["score_a"])
                 var score_b2: int = int(state2["score_b"])
-                print("    hit done, after +5 frames: steps=%d score=%d-%d" % [steps2, score_a2, score_b2])
+                print("    hit done, after +5 frames: steps=%d score=%d-%d episode=%d" % [steps2, score_a2, score_b2, env.live_episode_count])
                 _assert(steps2 < 20, "Pong live: should auto-reset after done, steps=%d" % steps2)
                 _assert(score_a2 < 100 and score_b2 < 100, "Pong live: score still bounded after reset, got %d-%d" % [score_a2, score_b2])
+                _assert(env.live_episode_count >= 1, "Pong live: episode count should increment after auto-reset, got %d" % env.live_episode_count)
         else:
                 print("    (did not hit done in 1500 frames — OK)")
         # Test N/B: switch genome (this was the trigger for the infinite score bug).

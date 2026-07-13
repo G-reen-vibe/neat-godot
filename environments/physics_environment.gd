@@ -47,6 +47,11 @@ var live_mode: bool = false
 ## Forward pass mode for the live genome ("topological" or "timestep").
 var live_forward_mode: String = "topological"
 
+## Episode counter for live mode. Incremented every time [method _live_step]
+## auto-resets the env because [method is_done] returned true. RunScreen reads
+## this to display the episode number in the visualization overlay.
+var live_episode_count: int = 0
+
 ## Network IO configuration (set by the env factory before reset).
 var input_node_ids: Array[int] = []
 var bias_node_id: int = -1
@@ -56,66 +61,66 @@ var output_node_ids: Array[int] = []
 ## Reset the environment: move all bodies back to their initial pose, zero
 ## velocities, bind [param p_genome] as the network being evaluated.
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
-	genome = p_genome
+        genome = p_genome
 
 ## Read the current physics state into a Dictionary of { input_id -> value }
 ## suitable for feeding back into [Genome.forward].
 func get_state() -> Dictionary:
-	return {}
+        return {}
 
 ## Apply an action (output of [method interpret_output]) to the bodies.
 ## Forces/impulses queued here take effect on the next physics frame.
 func apply_action(action: Dictionary) -> void:
-	pass
+        pass
 
 ## True if the simulation has ended (e.g. pole fell, time limit reached).
 func is_done() -> bool:
-	return false
+        return false
 
 ## Current accumulated fitness for this simulation.
 func current_fitness() -> float:
-	return 0.0
+        return 0.0
 
 ## Initial state for the first forward pass.
 func initial_state() -> Dictionary:
-	return get_state()
+        return get_state()
 
 ## Map the network's output (Dictionary of output_id -> activation) to an
 ## action Dictionary understood by [method apply_action]. Default: identity.
 func interpret_output(output: Dictionary) -> Dictionary:
-	return output
+        return output
 
 ## Return a Dictionary of renderable state for visualization.
 func get_visual_state() -> Dictionary:
-	return {}
+        return {}
 
 ## Returns "2d" or "3d" to indicate which view type should render this env.
 func view_type() -> String:
-	return "2d"
+        return "2d"
 
 ## True for physics-based envs. Used by the evaluator to route evaluation.
 func is_physics_based() -> bool:
-	return true
+        return true
 
 ## Step the env's game logic (increment steps, check done conditions, etc.).
 ## Subclasses MUST implement this. It is called from _physics_process for both
 ## training envs (where apply_action is called separately by the SceneEvaluator)
 ## and live envs (where _live_step handles both step_env and apply_action).
 func step_env() -> void:
-	pass
+        pass
 
 ## Freeze/unfreeze the env's physics bodies. When frozen, bodies won't move
 ## even when the physics server steps the world. Used by RunScreen to prevent
 ## the live env from being affected by SceneEvaluator physics steps during
 ## training. Subclasses MUST implement this.
 func set_bodies_frozen(frozen: bool) -> void:
-	pass
+        pass
 
 ## Set the live genome (the genome shown in the visualization). Does NOT
 ## reset the env — call [method reset] with the same genome to restart the
 ## simulation from the beginning.
 func set_live_genome(g: Genome) -> void:
-	live_genome = g
+        live_genome = g
 
 ## Enable/disable live mode. When enabled, the env's _physics_process drives
 ## the simulation using [member live_genome]. When disabled, _physics_process
@@ -130,7 +135,7 @@ func set_live_genome(g: Genome) -> void:
 ##   - Live env during pause: set_physics_process(true), live_mode=true,
 ##     bodies unfrozen.
 func set_live_mode(enabled: bool) -> void:
-	live_mode = enabled
+        live_mode = enabled
 
 ## Drive one live step. Called from the env's _physics_process when
 ## [member live_mode] is true. Handles: reset-if-done, step_env, apply_action.
@@ -144,21 +149,22 @@ func set_live_mode(enabled: bool) -> void:
 ##         step_env()
 ## [/code]
 func _live_step() -> void:
-	if live_genome == null:
-		return
-	# If done, reset and return (the new episode starts next tick).
-	if is_done():
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 12345
-		reset(live_genome, rng)
-		return
-	# Step game logic.
-	step_env()
-	# If step_env made us done, return (reset happens next tick).
-	if is_done():
-		return
-	# Apply the live genome's action.
-	var state: Dictionary = get_state()
-	var output: Dictionary = live_genome.forward(state, live_forward_mode)
-	var action: Dictionary = interpret_output(output)
-	apply_action(action)
+        if live_genome == null:
+                return
+        # If done, reset and return (the new episode starts next tick).
+        if is_done():
+                live_episode_count += 1
+                var rng := RandomNumberGenerator.new()
+                rng.seed = 12345
+                reset(live_genome, rng)
+                return
+        # Step game logic.
+        step_env()
+        # If step_env made us done, return (reset happens next tick).
+        if is_done():
+                return
+        # Apply the live genome's action.
+        var state: Dictionary = get_state()
+        var output: Dictionary = live_genome.forward(state, live_forward_mode)
+        var action: Dictionary = interpret_output(output)
+        apply_action(action)

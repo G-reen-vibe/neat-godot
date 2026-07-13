@@ -91,11 +91,6 @@ var _disposing: bool = false
 var _live_is_best: bool = true
 var _live_idx: int = -1  # index into pop.genomes; -1 means "best"
 
-# Episode counter for the live env (how many times it has auto-reset since
-# the last N/B press). Displayed in the viz overlay.
-var _live_episode: int = 0
-var _prev_live_done: bool = false
-
 func _ready() -> void:
         _back_btn.pressed.connect(func(): back_requested.emit())
         _config_btn.pressed.connect(func(): config_requested.emit())
@@ -122,8 +117,6 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _pop = pop
         _live_is_best = true
         _live_idx = -1
-        _live_episode = 0
-        _prev_live_done = false
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
         _stats_tracker.set_config_snapshot(config)
@@ -170,6 +163,11 @@ func _setup_visualization() -> void:
                 _viz_container.add_child(_env_viewport)
                 _env_viewport.set_env_scene(_env_scene, _view_type)
                 _live_env = _env_viewport.env
+                # Disable the env's _physics_process immediately — it should NOT run
+                # until we explicitly enable it (when paused). During training, the
+                # live env is frozen + physics_process off.
+                if _live_env != null:
+                        _live_env.set_physics_process(false)
                 # Configure the live env's IO so the live genome can drive it.
                 if _live_env != null and _live_env.has_method("set_max_steps"):
                         _live_env.set_max_steps(int(_extra.get("_max_steps", 500)))
@@ -291,9 +289,8 @@ func _set_live_env_active(active: bool) -> void:
         if _live_env.has_method("set_bodies_frozen"):
                 _live_env.set_bodies_frozen(not active)
         if active:
-                # Reset episode counter when transitioning to active.
-                _live_episode = 0
-                _prev_live_done = false
+                # Reset the env's episode counter when transitioning to active.
+                _live_env.live_episode_count = 0
 
 # --- Live genome selection (N / B keys) ---
 
@@ -335,11 +332,10 @@ func _reset_live_env() -> void:
                 # Update the live genome on the env.
                 if _live_env != null and is_instance_valid(_live_env):
                         _live_env.set_live_genome(g)
+                        _live_env.live_episode_count = 0
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
                 _env_viewport.reset_env(g, rng)
-                _live_episode = 0
-                _prev_live_done = false
 
 # --- Input ---
 
@@ -367,12 +363,6 @@ func _input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
-        # Track episode transitions for the live env (when paused).
-        if _speed == 0 and _live_env != null and is_instance_valid(_live_env):
-                var cur_done: bool = _live_env.is_done() if _live_env.has_method("is_done") else false
-                if cur_done and not _prev_live_done:
-                        _live_episode += 1
-                _prev_live_done = cur_done
         # Refresh the status label + viz overlay every render frame.
         _update_ui()
         # Start training only if speed > 0, not already stepping.
@@ -468,10 +458,13 @@ func _update_ui() -> void:
                 _save_load_view.config = _config
         # Update the viz overlay (training indicator / genome label / episode).
         if _env_viewport != null and is_instance_valid(_env_viewport):
+                var ep: int = 0
+                if _live_env != null and is_instance_valid(_live_env):
+                        ep = _live_env.live_episode_count
                 _env_viewport.set_overlay_info({
                         "training": _speed != 0,
                         "live_label": live_str,
-                        "episode": _live_episode,
+                        "episode": ep,
                         "gen": _pop.generation,
                         "best": _pop.best_fitness,
                 })
