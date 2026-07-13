@@ -106,7 +106,10 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
         _stats_tracker.set_config_snapshot(config)
-        _stats_tracker.record(pop)
+        # Note: we do NOT record here — the genomes haven't been evaluated yet
+        # (fitness=0). The first meaningful record happens in _step_generation()
+        # after evaluation. Recording here would create a spurious "generation 0"
+        # entry with all-zero fitness that pollutes the charts.
         _stats_view.tracker = _stats_tracker
         _save_load_view.population = pop
         _save_load_view.config = config
@@ -406,8 +409,8 @@ func _is_solved() -> bool:
         match _env_idx:
                 0: return _pop.best_fitness >= float(_extra.get("_solved_threshold", 15.5))
                 1: return _pop.best_fitness >= float(_extra.get("_max_steps", 500)) * 0.98
-                2: return _pop.best_fitness >= 3.0
-                3: return _pop.best_fitness >= 200.0
+                2: return _pop.best_fitness >= 1.5  # Acrobot: tip above threshold (height > 1.0) + step bonus
+                3: return _pop.best_fitness >= float(_extra.get("_points_to_win", 5)) * 6.0  # Pong: win + hits + survival
                 _: return false
 
 func _update_ui() -> void:
