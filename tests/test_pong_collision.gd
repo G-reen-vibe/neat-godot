@@ -29,8 +29,12 @@ func _ready() -> void:
         var rng := RandomNumberGenerator.new()
         rng.seed = 42
         _env.reset(null, rng)
-        # Force the ball to move LEFT toward paddle A.
-        _env._ball.linear_velocity = Vector2(-3.0, 0.0)
+        # Yield one physics frame so the teleport (from reset) applies before we
+        # override the ball velocity.
+        await get_tree().physics_frame
+        # Force the ball to move LEFT toward paddle A via request_teleport (reliable).
+        # Direct .linear_velocity assignment would be overwritten by the physics server.
+        _env._ball.request_teleport(Transform2D(0.0, _env._ball.position), Vector2(-3.0, 0.0), 0.0)
         print("  Ball initial pos: ", _env._ball.position)
         print("  Ball initial vel (forced): ", _env._ball.linear_velocity)
         print("  Ball mass: ", _env._ball.mass)
