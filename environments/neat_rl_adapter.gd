@@ -98,16 +98,9 @@ func _ready() -> void:
         if _rl_env == null:
                 push_error("NeatRLAdapter[%s]: no RLEnvironment child found" % name)
                 return
-        # Hide the RL env's visual children (Polygon2D, Camera2D). The adapter
-        # renders the env via get_visual_state() + EnvViewport._draw(). The RL
-        # env's own visuals are for SubViewport rendering (used by the Academy in
-        # godot_rl), not for the NEAT live visualization. Without this, the RL
-        # env's Camera2D would become active in the main viewport and override
-        # the UI camera, and the Polygon2D children would render at world
-        # positions on top of the _draw() output.
-        _rl_env.visible = false
-        for cam in _rl_env.find_children("*", "Camera2D", true, false):
-                (cam as Camera2D).enabled = false
+        # The RL env renders naturally via its own Camera2D + Polygon2D children
+        # inside the SubViewport. No need to hide or disable anything — the
+        # SubViewport isolates the rendering from the main viewport.
         # Apply the NEAT max_steps to the RL env (if set). This keeps the RL env's
         # own is_done() (which checks _step_count >= max_steps) consistent with the
         # SceneEvaluator's step cap.

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestgridviz01"]
+
+[ext_resource type="Script" path="res://tests/test_grid_viz.gd" id="1_t"]
+
+[node name="TestGridViz" type="Node"]
+script = ExtResource("1_t")

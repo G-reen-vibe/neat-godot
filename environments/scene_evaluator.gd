@@ -42,6 +42,10 @@ var episodes_per_genome: int = 1
 ## Signature: (env: Node) -> void.
 var env_setup_fn: Callable = Callable()
 
+## Size of each SubViewport (pixels). Default 96x96 — small enough to fit
+## ~100 envs in a grid, large enough to see what's happening.
+var viewport_size: Vector2i = Vector2i(96, 96)
+
 # Internal: pool of (SubViewport, env) pairs.
 var _slots: Array = []  # Array[Dictionary] { viewport: SubViewport, env: Node, configured: bool }
 var _host: Node = null
@@ -69,11 +73,40 @@ func _setup_slots() -> void:
                         sv = SubViewport.new()
                         sv.world_2d = World2D.new()
                         sv.transparent_bg = true
-                sv.size = Vector2i(64, 64)  # minimal size; rendering disabled
-                sv.render_target_update_mode = SubViewport.UPDATE_DISABLED
+                sv.size = viewport_size
+                sv.render_target_update_mode = SubViewport.UPDATE_ALWAYS
                 sv.add_child(env)
                 _host.add_child(sv)
+                # Activate the env's Camera2D so it becomes the active camera for
+                # this SubViewport. Without this, dynamically created SubViewports
+                # may not render anything.
+                _activate_env_camera(env)
                 _slots.append({ "viewport": sv, "env": env, "configured": false })
+
+## Find and activate the first Camera2D in the env so it becomes the
+## active camera for its SubViewport.
+func _activate_env_camera(env: Node) -> void:
+        for child in env.find_children("*", "Camera2D", true, false):
+                var cam := child as Camera2D
+                cam.make_current()
+                return
+
+## Returns the SubViewport for slot [param idx], or null if out of range.
+## Used by RunScreen to re-parent viewports into a visible grid.
+func get_slot_viewport(idx: int) -> SubViewport:
+        if idx < 0 or idx >= _slots.size():
+                return null
+        return _slots[idx].viewport
+
+## Returns the env for slot [param idx], or null if out of range.
+func get_slot_env(idx: int) -> Node:
+        if idx < 0 or idx >= _slots.size():
+                return null
+        return _slots[idx].env
+
+## Returns the number of slots.
+func get_slot_count() -> int:
+        return _slots.size()
 
 ## Evaluate all genomes. Returns an Array[float] of fitnesses parallel to
 ## [param genomes]. MUST be awaited (this is a coroutine).
@@ -150,9 +183,11 @@ func _evaluate_batch(genomes: Array, start_idx: int, batch_size: int) -> Array[f
         return out
 
 ## Free all pooled slots. Call when the evaluator is no longer needed.
+## Safe to call even if some SubViewports were already freed (e.g. re-parented
+## into a grid that was itself queue_free'd).
 func dispose() -> void:
         for slot in _slots:
-                var sv: SubViewport = slot.viewport
-                if is_instance_valid(sv):
+                var sv = slot.viewport  # untyped: may be a freed instance
+                if sv != null and is_instance_valid(sv):
                         sv.queue_free()
         _slots.clear()

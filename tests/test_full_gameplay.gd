@@ -1,16 +1,15 @@
 extends Node
 ## Full end-to-end test: simulates the entire gameplay flow as if a user was
-## playing the game. Tests:
+## playing the game with the new grid-based UI. Tests:
 ##   1. Population initialization with each env's config.
 ##   2. SceneEvaluator creation + env_setup_fn configuration.
 ##   3. Multiple training generations (evaluate -> set fitness -> evolve).
-##   4. Live env setup (set_live_genome, set_live_mode, set_bodies_frozen).
-##   5. Live env auto-reset on done (via _live_step).
-##   6. Best genome selection + visualization reset.
-##   7. Save/load (best genome duplication).
-##   8. Dispose (cleanup SubViewports).
+##   4. Grid visualization structure (SubViewports re-parented into grid cells).
+##   5. Cell labels update with fitness after each generation.
+##   6. Save/load (best genome duplication).
+##   7. Dispose (cleanup SubViewports).
 ##
-## This test does NOT use the UI (RunScreen); it directly drives the same
+## This test does NOT use the RunScreen UI; it directly drives the same
 ## components the UI uses, in the same order a user would trigger them.
 ##
 ## Run with:
@@ -24,7 +23,7 @@ const MAX_STEPS: int = 100
 var _failed: bool = false
 
 func _ready() -> void:
-	print("=== test_full_gameplay: full end-to-end flow ===")
+	print("=== test_full_gameplay: full end-to-end flow (grid UI) ===")
 	await _test()
 	if _failed:
 		printerr("\n=== test_full_gameplay: FAILED ===")
@@ -39,7 +38,6 @@ func _assert(cond: bool, msg: String) -> void:
 		_failed = true
 
 func _test() -> void:
-	# Test each env as if a user selected it, configured it, and trained.
 	var envs: Array = [
 		{
 			"name": "CartPole",
@@ -129,7 +127,36 @@ func _test_one_env(env_info: Dictionary) -> bool:
 		env.output_node_id = output_start
 		env.output_node_ids = output_ids
 		env.set_max_steps(MAX_STEPS)
-	# 4. Training loop (like RunScreen._step_generation).
+	# 4. Build grid (like RunScreen._build_grid) — re-parent SubViewports.
+	var cells: Array[Dictionary] = []
+	var grid := GridContainer.new()
+	grid.columns = 5
+	add_child(grid)
+	for i in range(evaluator.get_slot_count()):
+		var cell := Control.new()
+		cell.custom_minimum_size = Vector2(96, 96)
+		grid.add_child(cell)
+		var svc := SubViewportContainer.new()
+		svc.stretch = true
+		svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+		cell.add_child(svc)
+		var lbl := Label.new()
+		lbl.text = "#%d" % i
+		lbl.add_theme_font_size_override("font_size", 9)
+		lbl.position = Vector2(2, 1)
+		cell.add_child(lbl)
+		var vp: SubViewport = evaluator.get_slot_viewport(i)
+		if vp:
+			vp.get_parent().remove_child(vp)
+			svc.add_child(vp)
+			var env: Node = evaluator.get_slot_env(i)
+			if env:
+				for child in env.find_children("*", "Camera2D", true, false):
+					(child as Camera2D).make_current()
+					break
+		cells.append({ "svc": svc, "label": lbl, "viewport": vp })
+	_assert(cells.size() == NUM_SLOTS, "%s: grid has %d cells" % [env_info.name, cells.size()])
+	# 5. Training loop (like RunScreen._step_generation).
 	var best_f: float = -1e9
 	for gen in range(MAX_GENERATIONS):
 		var fitnesses: Array[float] = await evaluator.evaluate_all(pop.genomes)
@@ -141,59 +168,20 @@ func _test_one_env(env_info: Dictionary) -> bool:
 				pop.best_fitness = fitnesses[i]
 				pop.best_genome = pop.genomes[i].duplicate()
 		print("    gen=%d  best=%.1f  species=%d" % [pop.generation, best_f, pop.species_count()])
+		# Update cell labels (like RunScreen._update_ui).
+		for i in range(cells.size()):
+			if i < pop.genomes.size():
+				cells[i].label.text = "#%d  %.1f" % [i, pop.genomes[i].fitness]
 		pop.evolve()
 	_assert(best_f != -1e9, "%s: fitness was set" % env_info.name)
 	_assert(pop.best_genome != null, "%s: best genome exists" % env_info.name)
 	_assert(pop.generation == MAX_GENERATIONS, "%s: generation = %d" % [env_info.name, pop.generation])
-	# 5. Test live env setup (like RunScreen._setup_visualization).
-	var live_env: Node = env_scene.instantiate()
-	add_child(live_env)
-	await get_tree().process_frame  # let _ready fire
-	_assert(live_env is NeatRLAdapter, "%s: live env is NeatRLAdapter" % env_info.name)
-	# Configure IO (like env_setup_fn).
-	live_env.input_node_ids = input_ids
-	live_env.bias_node_id = bias_id
-	live_env.output_node_id = output_start
-	live_env.output_node_ids = output_ids
-	live_env.set_max_steps(MAX_STEPS)
-	# Set live genome (best genome from training).
-	live_env.set_live_genome(pop.best_genome)
-	live_env.live_forward_mode = cfg.forward_mode
-	live_env.set_live_mode(false)
-	live_env.set_physics_process(false)
-	live_env.set_bodies_frozen(true)
-	# Reset with fixed seed (like RunScreen._reset_live_env).
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 12345
-	live_env.reset(pop.best_genome, rng)
-	await get_tree().physics_frame  # let teleport apply
-	_assert(not live_env.is_done(), "%s: not done after reset" % env_info.name)
-	# 6. Enable live mode (like RunScreen._set_live_env_active(true)).
-	live_env.set_live_mode(true)
-	live_env.set_physics_process(true)
-	live_env.set_bodies_frozen(false)
-	live_env.live_episode_count = 0
-	# Run live for ~60 frames, verify it auto-resets on done.
-	var initial_episode: int = live_env.live_episode_count
-	for i in range(200):
-		await get_tree().physics_frame
-	# The live env should have run some episodes (or at least not crashed).
-	_assert(is_instance_valid(live_env), "%s: live env still valid after 200 frames" % env_info.name)
-	print("    live episodes after 200 frames: %d" % live_env.live_episode_count)
-	# 7. Switch back to training mode (like _set_live_env_active(false)).
-	live_env.set_live_mode(false)
-	live_env.set_physics_process(false)
-	live_env.set_bodies_frozen(true)
-	# 8. Test genome switching (N key -> next genome).
-	if pop.genomes.size() > 1:
-		live_env.set_live_genome(pop.genomes[0])
-		rng.seed = 12345
-		live_env.reset(pop.genomes[0], rng)
-		await get_tree().physics_frame
-		_assert(not live_env.is_done(), "%s: not done after genome switch" % env_info.name)
-	# 9. Cleanup.
-	live_env.queue_free()
+	# 6. Verify grid cells still valid after training.
+	for i in range(cells.size()):
+		_assert(is_instance_valid(cells[i].svc), "%s: cell %d SVC still valid after training" % [env_info.name, i])
+	# 7. Cleanup.
+	grid.queue_free()
 	await get_tree().process_frame
 	evaluator.dispose()
-	print("    RESULT: %s best=%.3f, live OK" % [env_info.name, best_f])
+	print("    RESULT: %s best=%.3f, grid OK" % [env_info.name, best_f])
 	return not _failed
