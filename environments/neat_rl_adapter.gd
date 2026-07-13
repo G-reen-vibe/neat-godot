@@ -58,9 +58,20 @@ var _cumulative_fitness: float = 0.0
 var _reset_pending: bool = false
 
 ## Set by step_env() to indicate whether this step was skipped (due to
-## _reset_pending or null _rl_env). Subclasses that override step_env()
+## _reset_pending, _done, or null _rl_env). Subclasses that override step_env()
 ## should check this after calling super.step_env() and return early if true.
 var _step_skipped: bool = false
+
+## Local "done" flag, set after accumulating the final-step reward. Prevents
+## re-accumulation on subsequent physics frames (the env stays in the
+## SceneTree after is_done() returns true, so _physics_process keeps firing).
+## Without this, the reward would be inflated: e.g. Pong's _reward stays at
+## +1 after a score, so every frame after done would add +1 to fitness.
+## Without the separate flag (just checking is_done() before accumulating),
+## the final-step reward (e.g. LunarLander's +100 for safe landing) would
+## NEVER be accumulated, because is_done() is already true when step_env
+## reads it (the physics engine stepped before _physics_process).
+var _done: bool = false
 
 ## Max steps per episode. Set by env_setup_fn via [method set_max_steps].
 ## Defaults to 0 meaning "use the RL env's own max_steps".
@@ -124,6 +135,7 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
         super.reset(p_genome, rng)
         _cumulative_fitness = 0.0
         _reset_pending = true
+        _done = false
         # Seed the global RNG from our per-genome-per-episode RNG so the RL env's
         # randf_range calls (in agent.reset() and env._on_reset()) are deterministic
         # per genome + episode. This is the minimal way to make the godot_rl envs
@@ -183,22 +195,31 @@ func step_env() -> void:
                 _reset_pending = false
                 _step_skipped = true
                 return
-        # Stop stepping once the env is done. Without this, _physics_process
-        # keeps firing after the episode ends (the env is still in the SceneTree),
-        # and step_env would keep accumulating reward (e.g. Pong's _reward stays
-        # at +1 after a score, inflating fitness by +1 per step for the remaining
-        # frames until the SceneEvaluator's step loop notices done and breaks).
-        if _rl_env.is_done() or (_primary_agent != null and _primary_agent.is_done()):
+        # If we've already accumulated the final-step reward, skip all further
+        # steps. This prevents re-accumulating the reward on subsequent physics
+        # frames (the env stays in the SceneTree after is_done() returns true).
+        if _done:
                 _step_skipped = true
                 return
         # Advance the RL env's per-step game logic (scoring, ball speed
-        # normalization, etc.). physics_step increments _step_count and calls
-        # _on_physics_step.
-        _rl_env.physics_step(get_physics_process_delta_time())
+        # normalization, etc.). Only if the env is not already done (the physics
+        # engine may have stepped and made the env done before _physics_process).
+        # Skip physics_step if done, but still accumulate the reward below to
+        # capture the final-step reward (e.g. LunarLander's +100 for safe landing).
+        var already_done: bool = _rl_env.is_done() or (_primary_agent != null and _primary_agent.is_done())
+        if not already_done:
+                _rl_env.physics_step(get_physics_process_delta_time())
         # Accumulate the primary agent's per-step reward. All godot_rl agents
         # return a per-step reward (not a running total), so we add the raw value.
+        # This captures the final-step reward even if the env became done during
+        # this physics frame.
         if _primary_agent != null:
                 _cumulative_fitness += _primary_agent.get_reward()
+        # If the env is now done (either from physics_step or from the physics
+        # engine's pre-_physics_process step), mark as done so we don't accumulate
+        # again on subsequent frames.
+        if _rl_env.is_done() or (_primary_agent != null and _primary_agent.is_done()):
+                _done = true
 
 
 func is_done() -> bool:
@@ -212,6 +233,20 @@ func is_done() -> bool:
 
 
 func current_fitness() -> float:
+        # If we've already accumulated the final-step reward (via step_env setting
+        # _done), return as-is.
+        if _done:
+                return _cumulative_fitness
+        # If the env is done but step_env hasn't processed the final step yet
+        # (because _physics_process fires BEFORE the physics server steps, so
+        # step_env reads the PREVIOUS state), add the final reward now. This
+        # ensures the SceneEvaluator gets the correct fitness when it calls
+        # current_fitness() after detecting is_done().
+        # Sets _done = true to prevent double-counting if step_env runs later.
+        if _rl_env != null and _primary_agent != null:
+                if _rl_env.is_done() or _primary_agent.is_done():
+                        _cumulative_fitness += _primary_agent.get_reward()
+                        _done = true
         return _cumulative_fitness
 
 
