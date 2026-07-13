@@ -31,7 +31,7 @@ const ENVS: Array = [
         },
         {
                 "name": "Pong",
-                "desc": "Play pong vs top-3 from\nprevious gen (tournament).",
+                "desc": "Control a paddle to hit\nthe bouncing ball.",
                 "color": Color(0.9, 0.3, 0.5),
                 "has_viz": true,
                 "physics": true,

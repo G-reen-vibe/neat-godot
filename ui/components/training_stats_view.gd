@@ -109,12 +109,19 @@ func refresh() -> void:
         _rebuild_species_table()
         # Config
         _rebuild_config_grid()
-        # History
-        for c in _history_list.get_children():
-                c.queue_free()
-        for entry in tracker.history:
+        # History — only append new entries instead of recreating all labels.
+        # This avoids freeing + recreating up to 500 labels every refresh.
+        var existing_count := _history_list.get_child_count()
+        var history_size := tracker.history.size()
+        # If history shrank (e.g., due to MAX_HISTORY cap popping front), rebuild.
+        if existing_count > history_size:
+                for c in _history_list.get_children():
+                        c.queue_free()
+                existing_count = 0
+        # Append only the new entries.
+        for i in range(existing_count, history_size):
                 var lbl := Label.new()
-                lbl.text = entry
+                lbl.text = tracker.history[i]
                 lbl.add_theme_color_override("font_color", COL_BODY)
                 lbl.add_theme_font_size_override("font_size", 10)
                 _history_list.add_child(lbl)
@@ -123,6 +130,9 @@ func refresh() -> void:
         _threshold_chart.queue_redraw()
 
 func _process(_delta: float) -> void:
+        # Skip auto-refresh when the Stats tab is not visible (performance).
+        if not is_visible_in_tree():
+                return
         # Auto-refresh a few times per second so the view stays live during training.
         _refresh_counter += 1
         if _refresh_counter >= 15:

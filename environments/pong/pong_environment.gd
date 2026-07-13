@@ -66,7 +66,6 @@ var _initial_paddle_a_pos: Vector2
 var _initial_paddle_b_pos: Vector2
 var _ball_pending_reset: bool = false
 var _ball_reset_dir: float = 1.0
-var _prev_ball_vx_sign: int = 0  # for hit detection backup
 
 func _ready() -> void:
         _initial_ball_pos = _ball.position
@@ -108,7 +107,6 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
         _hits_a = 0
         _hits_b = 0
         _ball_pending_reset = false
-        _prev_ball_vx_sign = 0
         # Paddles are AnimatableBody2D — direct position assignment is reliable
         # when sync_to_physics=false.
         _paddle_a.position = _initial_paddle_a_pos
@@ -124,7 +122,6 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
                 vel_y = randf_range(-0.8, 0.8)
         var initial_vel: Vector2 = Vector2(dir * BALL_SPEED * 0.7, vel_y)
         _ball.request_teleport(Transform2D(0.0, _initial_ball_pos), initial_vel, 0.0)
-        _prev_ball_vx_sign = sign(initial_vel.x)
 
 func get_state() -> Dictionary:
         return _build_state_dict_for_a()
@@ -201,18 +198,13 @@ func step_env() -> void:
                 var reset_vel: Vector2 = Vector2(_ball_reset_dir * BALL_SPEED * 0.7, randf_range(-0.5, 0.5))
                 _ball.request_teleport(Transform2D(0.0, _initial_ball_pos), reset_vel, 0.0)
                 _ball_pending_reset = false
-                _prev_ball_vx_sign = sign(reset_vel.x)
-        # Backup hit detection: if ball vx sign flipped near a paddle, count a hit.
-        var cur_vx_sign: int = sign(_ball.linear_velocity.x)
-        if cur_vx_sign != 0 and _prev_ball_vx_sign != 0 and cur_vx_sign != _prev_ball_vx_sign:
-                var abs_vx: float = absf(_ball.linear_velocity.x)
-                if absf(_ball.position.x - _paddle_a.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
-                        if cur_vx_sign > 0 and _prev_ball_vx_sign < 0:
-                                _hits_a += 1
-                elif absf(_ball.position.x - _paddle_b.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
-                        if cur_vx_sign < 0 and _prev_ball_vx_sign > 0:
-                                _hits_b += 1
-        _prev_ball_vx_sign = cur_vx_sign
+        # Note: Hit detection is handled by _on_ball_body_entered (contact_monitor
+        # is enabled on the ball). The old backup vx-sign detection was removed
+        # because it double-counted hits: body_entered fires AND the vx-sign flip
+        # fires on the same frame, inflating _hits_a/_hits_b by 2x. With
+        # sync_to_physics=false on paddles and contact_monitor=true on the ball,
+        # body_entered is reliable. Ball speed (4.0) * dt (1/60) = 0.067 units/frame
+        # is less than paddle_width + ball_radius (0.13), so tunneling doesn't occur.
         # Check score zones. Setting _ball_pending_reset ensures the ball is
         # recentered on the NEXT frame (via teleport), preventing multi-score.
         if _ball.position.x < -FIELD_WIDTH * 0.5:

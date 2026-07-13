@@ -39,6 +39,13 @@ var _current_species_idx: int = 0
 var _current_genome_idx: int = 0
 var _show_best: bool = false
 var _suppress_dropdown_callback: bool = false
+# Dirty flags: only rebuild dropdowns when the species/genome counts change.
+# Without these, _refresh() rebuilds OptionButtons every frame (clear + add_item
+# for every species/genome), which is a major performance issue.
+var _last_species_count: int = -1
+var _last_genome_count: int = -1
+var _last_best_genome: Genome = null
+var _dropdowns_dirty: bool = true
 
 var _graph_view: GraphView
 
@@ -80,6 +87,7 @@ func _prev_species_click() -> void:
         _current_species_idx = (_current_species_idx - 1 + population.species_list.size()) % population.species_list.size()
         _current_genome_idx = 0
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 func _next_species_click() -> void:
@@ -88,6 +96,7 @@ func _next_species_click() -> void:
         _current_species_idx = (_current_species_idx + 1) % population.species_list.size()
         _current_genome_idx = 0
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 func _on_species_dropdown_selected(idx: int) -> void:
@@ -98,6 +107,7 @@ func _on_species_dropdown_selected(idx: int) -> void:
         _current_species_idx = idx
         _current_genome_idx = 0
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 # --- Genome navigation ---
@@ -108,6 +118,7 @@ func _prev_genome_click() -> void:
                 return
         _current_genome_idx = (_current_genome_idx - 1 + sp.members.size()) % sp.members.size()
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 func next_genome() -> void:
@@ -119,6 +130,7 @@ func _next_genome_click() -> void:
                 return
         _current_genome_idx = (_current_genome_idx + 1) % sp.members.size()
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 func _on_genome_dropdown_selected(idx: int) -> void:
@@ -129,6 +141,7 @@ func _on_genome_dropdown_selected(idx: int) -> void:
                 return
         _current_genome_idx = idx
         _set_show_best(false)
+        _dropdowns_dirty = true
         _refresh()
 
 # --- Best genome toggle ---
@@ -143,6 +156,7 @@ func _on_best_pressed() -> void:
 func _set_show_best(v: bool) -> void:
         _show_best = v
         _best_btn.set_pressed_no_signal(v)
+        _dropdowns_dirty = true
         _refresh()
 
 func show_best() -> void:
@@ -174,20 +188,44 @@ func _current_genome() -> Genome:
 func _refresh() -> void:
         if population == null:
                 return
+        # Check if dropdowns need rebuilding (species/genome count changed, or
+        # best genome changed, or first run). This avoids rebuilding OptionButtons
+        # every frame — a major performance issue.
+        var sp_count: int = population.species_list.size()
+        var cur_sp := _current_species()
+        var gen_count: int = cur_sp.members.size() if cur_sp != null else 0
+        var best_changed: bool = population.best_genome != _last_best_genome
+        if sp_count != _last_species_count or gen_count != _last_genome_count or best_changed or _dropdowns_dirty:
+                _dropdowns_dirty = false
+                _last_species_count = sp_count
+                _last_genome_count = gen_count
+                _last_best_genome = population.best_genome
+                # Rebuild dropdowns by falling through to the normal refresh path.
+                # The _update_dropdowns calls below will rebuild.
+                _passive_refresh(true)
+        else:
+                # Dropdowns are up-to-date; just update labels + stats + graph.
+                _passive_refresh(false)
+        # Update the graph view's genome.
+        var g: Genome = _current_genome()
+        _graph_view.genome = g
+
+func _passive_refresh(rebuild_dropdowns: bool) -> void:
         # If showing best, use the best genome directly.
         if _show_best:
                 if population.best_genome == null:
-                        # No best genome yet; show a message and fall back.
                         _species_label.text = "Best Genome"
                         _genome_label.text = "(not available)"
                         _graph_view.genome = null
-                        _update_dropdowns_for_best()
+                        if rebuild_dropdowns:
+                                _update_dropdowns_for_best()
                         _update_best_unavailable_stats()
                         return
                 _species_label.text = "Best Genome"
                 _genome_label.text = "(snapshot)"
                 _graph_view.genome = population.best_genome
-                _update_dropdowns_for_best()
+                if rebuild_dropdowns:
+                        _update_dropdowns_for_best()
                 _update_genome_stats(population.best_genome, null)
                 return
         var sp := _current_species()
@@ -195,14 +233,16 @@ func _refresh() -> void:
                 _species_label.text = "Species -/-"
                 _genome_label.text = "Genome -/-"
                 _graph_view.genome = null
-                _update_dropdowns(true)
+                if rebuild_dropdowns:
+                        _update_dropdowns(true)
                 _clear_stats()
                 return
         _species_label.text = "Species %d  (%d/%d)" % [sp.id, _current_species_idx + 1, population.species_list.size()]
         if sp.members.is_empty():
                 _genome_label.text = "Genome -/-"
                 _graph_view.genome = null
-                _update_dropdowns(true)
+                if rebuild_dropdowns:
+                        _update_dropdowns(true)
                 _clear_stats()
                 return
         if _current_genome_idx >= sp.members.size():
@@ -210,7 +250,8 @@ func _refresh() -> void:
         var g: Genome = sp.members[_current_genome_idx]
         _genome_label.text = "Genome %d/%d" % [_current_genome_idx + 1, sp.members.size()]
         _graph_view.genome = g
-        _update_dropdowns()
+        if rebuild_dropdowns:
+                _update_dropdowns()
         _update_genome_stats(g, sp)
 
 func _update_dropdowns_for_best() -> void:

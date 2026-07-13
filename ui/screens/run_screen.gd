@@ -210,9 +210,14 @@ func _dispose_evaluator() -> void:
         _evaluator = null
 
 func _exit_tree() -> void:
-        # Mark as disposing first so in-flight coroutines bail out, then clean
-        # up the evaluator (frees its SubViewports).
+        # Mark as disposing first so in-flight coroutines bail out.
         _disposing = true
+        # Disable the live env's _physics_process immediately so it doesn't
+        # run _live_step on a partially-freed env during the next physics frame.
+        if _live_env != null and is_instance_valid(_live_env):
+                _live_env.set_physics_process(false)
+                _live_env.set_live_mode(false)
+        # Dispose the evaluator (frees its SubViewports).
         _dispose_evaluator()
 
 func _make_xor_env() -> XorEnvironment:
@@ -269,14 +274,14 @@ func _on_speed_index_changed(idx: int) -> void:
 func _on_speed_down() -> void:
         var idx: int = _speed_option.selected
         if idx > 0:
+                # Setting `selected` fires `item_selected` which calls _on_speed_index_changed.
+                # No need to call it manually — that would double-fire.
                 _speed_option.selected = idx - 1
-                _on_speed_index_changed(idx - 1)
 
 func _on_speed_up() -> void:
         var idx: int = _speed_option.selected
         if idx < SPEED_PRESETS.size() - 1:
                 _speed_option.selected = idx + 1
-                _on_speed_index_changed(idx + 1)
 
 ## Activate/deactivate the live env for visualization.
 ## When active (paused): physics_process ON, bodies unfrozen, live_mode ON.
@@ -452,7 +457,11 @@ func _update_ui() -> void:
         if _xor_table != null and is_instance_valid(_xor_table):
                 _xor_table.genome = _live_genome()
         if _stats_view != null:
-                _stats_view.refresh()
+                # Don't call _stats_view.refresh() here — it's expensive (rebuilds
+                # species table + history labels) and TrainingStatsView._process
+                # already auto-refreshes every 15 frames. Calling it every frame
+                # from _update_ui was a major performance issue.
+                pass
         if _save_load_view != null:
                 _save_load_view.population = _pop
                 _save_load_view.config = _config

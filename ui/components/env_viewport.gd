@@ -35,6 +35,10 @@ var _info_text: String = ""
 var _steps: int = 0
 var _max_steps: int = 0
 var _done: bool = false
+# Cached visual state — read once per frame in _process, reused in _draw.
+# Without this, get_visual_state() was called twice per frame (once in
+# _process for info text, once in _draw for rendering).
+var _cached_state: Dictionary = {}
 
 # Overlay info set by RunScreen.
 var _overlay_training: bool = false
@@ -104,14 +108,16 @@ func _process(delta: float) -> void:
         if _pan_input != Vector2.ZERO:
                 _camera_offset += _pan_input * CAMERA_PAN_SPEED * delta
         if env == null or not is_instance_valid(env):
+                _cached_state = {}
+                queue_redraw()
                 return
-        # Read visual state for info display.
+        # Read visual state ONCE per frame and cache it for _draw.
         if env.has_method("get_visual_state"):
-                var state: Dictionary = env.get_visual_state()
-                _steps = int(state.get("steps", 0))
-                _max_steps = int(state.get("max_steps", 0))
-                _done = bool(state.get("done", false))
-                _info_text = _format_info(state)
+                _cached_state = env.get_visual_state()
+                _steps = int(_cached_state.get("steps", 0))
+                _max_steps = int(_cached_state.get("max_steps", 0))
+                _done = bool(_cached_state.get("done", false))
+                _info_text = _format_info(_cached_state)
         queue_redraw()
 
 func _format_info(state: Dictionary) -> String:
@@ -178,7 +184,11 @@ func _draw() -> void:
         if not env.has_method("get_visual_state"):
                 draw_string(ThemeDB.fallback_font, Vector2(8, 20), "No visualization", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.5))
                 return
-        var state: Dictionary = env.get_visual_state()
+        # Use the cached state from _process (avoids calling get_visual_state twice).
+        var state: Dictionary = _cached_state
+        if state.is_empty():
+                # Fallback: if _process hasn't run yet, read it now.
+                state = env.get_visual_state()
         # Compute camera transform.
         var center := size_vec * 0.5 + _camera_offset
         var zoom := _camera_zoom * _scale

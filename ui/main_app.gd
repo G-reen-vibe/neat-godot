@@ -60,11 +60,15 @@ func _on_start_training(config: NeatConfig, extra: Dictionary) -> void:
         await get_tree().process_frame
         _run_screen = RunScreenScene.instantiate()
         _run_slot.add_child(_run_screen)
-        var pop := Population.new(config)
-        pop.initialize()
-        _run_screen.setup(_env_idx, config, extra, pop)
+        # Connect signals BEFORE setup so they're ready when the screen is shown.
         _run_screen.back_requested.connect(func(): _show_screen(Screen.ENV_SELECT))
         _run_screen.config_requested.connect(func():
                 _config_screen.configure_for_env(_env_idx)
                 _show_screen(Screen.CONFIG))
+        var pop := Population.new(config)
+        pop.initialize()
+        # Await setup completion before showing the screen, so the user never
+        # sees a blank panel (setup is async — it awaits a process_frame to
+        # clear + rebuild the viz container).
+        await _run_screen.setup(_env_idx, config, extra, pop)
         _show_screen(Screen.RUN)
