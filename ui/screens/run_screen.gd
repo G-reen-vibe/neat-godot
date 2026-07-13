@@ -4,21 +4,21 @@
 ##   HSplitContainer
 ##     Left (stretch=1.0):
 ##       VBox
-##         Header (toolbar: back, config, pause/resume, status, solved)
+##         Header (toolbar: back, config, speed down/dropdown/up, status, solved)
 ##         VizToolbar (zoom in/out, reset view)
 ##         VizContainer (env viewport or XOR truth table)
 ##         HelpBar (key hints)
 ##     Right (fixed 420px):
 ##       TabContainer (Genome / Stats / Saving)  -- managed by another agent
 ##
-## Training control: a single Pause/Resume toggle button.
-##   - Resume (default): training runs continuously, one generation per
-##     physics_frame await. The live env is FROZEN during training to avoid
-##     interference (training and live env share the same SceneTree; running
-##     both simultaneously causes the live env to flicker/teleport because
-##     the SceneEvaluator's physics_frame awaits also step the live env).
-##   - Pause: training halts; the live env replays the selected genome so
-##     the user can watch its behavior.
+## Training control: speed dropdown with speed=0 (Pause) .. 50x.
+##   - speed=0 (Pause): training halted; live env replays the selected genome.
+##   - speed=N: run N generations per render frame.
+##
+## The live env is ONLY driven when speed=0 (paused). During training, the live
+## env's _physics_process is disabled so it doesn't interfere with the
+## SceneEvaluator's physics_frame awaits (which step all worlds in the
+## SceneTree, including the live env).
 ##
 ## N/B cycle the live genome shown in the visualization (not the graph).
 extends MarginContainer
@@ -33,9 +33,15 @@ const SaveLoadViewScene: PackedScene = preload("res://ui/components/save_load_vi
 const EnvViewportScene: PackedScene = preload("res://ui/components/env_viewport.tscn")
 const XorTruthTableScene: PackedScene = preload("res://ui/components/xor_truth_table.tscn")
 
+# Speed presets: index in OptionButton -> generations per frame.
+# Index 0 is Pause (speed=0); indices 1..6 are 1x..50x.
+const SPEED_PRESETS: Array[int] = [0, 1, 2, 5, 10, 25, 50]
+
 @onready var _back_btn: Button = %BackBtn
 @onready var _config_btn: Button = %ConfigBtn
-@onready var _pause_resume_btn: Button = %PauseResumeBtn
+@onready var _speed_down_btn: Button = %SpeedDownBtn
+@onready var _speed_option: OptionButton = %SpeedOption
+@onready var _speed_up_btn: Button = %SpeedUpBtn
 @onready var _status_label: Label = %StatusLabel
 @onready var _solved_label: Label = %SolvedLabel
 @onready var _viz_container: PanelContainer = %VizContainer
@@ -59,9 +65,8 @@ var _env_idx: int = -1
 var _env_scene: PackedScene = null
 var _view_type: String = "2d"
 var _solved: bool = false
-# _paused: when true, training is halted and the live env replays the selected
-# genome. When false, training runs and the live env is frozen.
-var _paused: bool = false
+# _speed: generations per frame. 0 = paused (live env active).
+var _speed: int = 1
 var _stepping: bool = false
 var _evaluator: Variant = null  # Evaluator or SceneEvaluator
 var _stats_tracker: TrainingStatsTracker = null
@@ -79,10 +84,14 @@ var _live_idx: int = -1  # index into pop.genomes; -1 means "best"
 func _ready() -> void:
         _back_btn.pressed.connect(func(): back_requested.emit())
         _config_btn.pressed.connect(func(): config_requested.emit())
-        _pause_resume_btn.toggled.connect(_on_pause_resume_toggled)
+        _speed_option.item_selected.connect(_on_speed_index_changed)
+        _speed_down_btn.pressed.connect(_on_speed_down)
+        _speed_up_btn.pressed.connect(_on_speed_up)
         _zoom_in_btn.pressed.connect(func(): _adjust_zoom(1.25))
         _zoom_out_btn.pressed.connect(func(): _adjust_zoom(1.0 / 1.25))
         _reset_view_btn.pressed.connect(_on_reset_view)
+        # Initialize speed from the OptionButton's default selection.
+        _speed = SPEED_PRESETS[_speed_option.selected]
         # Build the right-tab children (managed by another agent; we only host them).
         _visualizer = GraphVisualizerScene.instantiate()
         _genome_tab.add_child(_visualizer)
@@ -97,18 +106,11 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _extra = extra
         _pop = pop
         _solved = false
-        _paused = false
-        _pause_resume_btn.button_pressed = false
-        _pause_resume_btn.text = "Pause"
         _live_is_best = true
         _live_idx = -1
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
         _stats_tracker.set_config_snapshot(config)
-        # Note: we do NOT record here — the genomes haven't been evaluated yet
-        # (fitness=0). The first meaningful record happens in _step_generation()
-        # after evaluation. Recording here would create a spurious "generation 0"
-        # entry with all-zero fitness that pollutes the charts.
         _stats_view.tracker = _stats_tracker
         _save_load_view.population = pop
         _save_load_view.config = config
@@ -129,6 +131,8 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
                         _view_type = "2d"
         await _setup_visualization()
         _setup_evaluator()
+        # Start with live env disabled (training active by default at speed=1).
+        _set_live_env_active(false)
         _update_ui()
 
 func _setup_visualization() -> void:
@@ -228,15 +232,40 @@ func _make_env_setup_fn() -> Callable:
                                 env.set_forward_mode(fwd_mode)
         return Callable()
 
-# --- Pause/Resume control ---
+# --- Speed control ---
 
-func _on_pause_resume_toggled(pressed: bool) -> void:
-        _paused = pressed
-        _pause_resume_btn.text = "Resume" if _paused else "Pause"
-        # When unpausing, reset the live env so it starts fresh when next paused.
-        # When pausing, the live env will start replaying on the next physics tick.
-        if not _paused:
+func _on_speed_index_changed(idx: int) -> void:
+        idx = clampi(idx, 0, SPEED_PRESETS.size() - 1)
+        var new_speed: int = SPEED_PRESETS[idx]
+        if new_speed == _speed:
+                return
+        _speed = new_speed
+        # Live env is active only when paused (speed == 0).
+        _set_live_env_active(_speed == 0)
+        if _speed == 0:
+                # Just paused — reset live env so it starts fresh.
                 _reset_live_env()
+
+func _on_speed_down() -> void:
+        var idx: int = _speed_option.selected
+        if idx > 0:
+                _speed_option.selected = idx - 1
+                _on_speed_index_changed(idx - 1)
+
+func _on_speed_up() -> void:
+        var idx: int = _speed_option.selected
+        if idx < SPEED_PRESETS.size() - 1:
+                _speed_option.selected = idx + 1
+                _on_speed_index_changed(idx + 1)
+
+## Enable/disable the live env's physics processing. When training is active,
+## the live env must NOT run _physics_process (it would interfere with the
+## SceneEvaluator and desync the visualization). When paused, the live env
+## runs normally so the user can watch the selected genome.
+func _set_live_env_active(active: bool) -> void:
+        if _live_env == null or not is_instance_valid(_live_env):
+                return
+        _live_env.set_physics_process(active)
 
 # --- Live genome selection (N / B keys) ---
 
@@ -292,9 +321,12 @@ func _input(event: InputEvent) -> void:
                         _show_best_live_genome()
                         get_viewport().set_input_as_handled()
                 KEY_SPACE:
-                        _paused = not _paused
-                        _pause_resume_btn.button_pressed = _paused
-                        _on_pause_resume_toggled(_paused)
+                        # Toggle between paused (speed=0) and running (speed=1).
+                        if _speed == 0:
+                                _speed_option.selected = 1
+                        else:
+                                _speed_option.selected = 0
+                        # The item_selected signal fires _on_speed_index_changed.
                         get_viewport().set_input_as_handled()
 
 # --- Process loop ---
@@ -304,44 +336,34 @@ func _process(_delta: float) -> void:
                 return
         # Refresh the status label every render frame.
         _update_ui()
-        # Start a training step only if not paused, not already stepping, not
-        # solved, and not disposing. The live env is FROZEN during training
-        # (driven only when _paused is true, in _physics_process).
-        if _paused or _stepping or _solved or _disposing:
+        # Start training only if speed > 0, not already stepping, not solved.
+        if _speed == 0 or _stepping or _solved or _disposing:
                 return
         if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
                 return
         # Launch the step coroutine; it runs independently of _process and
-        # sets _stepping = false when done. _process keeps firing every frame
-        # for UI updates while the coroutine is running.
+        # sets _stepping = false when done.
         _stepping = true
         _step_budget()
 
-## Run one generation, then clear the stepping flag. Launched as a free-
-## floating coroutine from _process; cancelled automatically when the RunScreen
-## is freed.
+## Run up to `_speed` generations, then clear the stepping flag. Launched as
+## a free-floating coroutine from _process.
 func _step_budget() -> void:
-        while not _paused and not _solved and not _disposing:
+        var steps_done: int = 0
+        while steps_done < _speed and _speed > 0 and not _solved and not _disposing:
                 if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
                         break
                 await _step_generation()
-                # Yield at least one frame so the UI doesn't freeze when the
-                # evaluator is synchronous (XOR uses a threaded Evaluator that
-                # completes immediately, unlike SceneEvaluator which awaits
-                # physics frames).
-                await get_tree().process_frame
+                steps_done += 1
         _stepping = false
 
-## Drive the live env every physics tick, but ONLY when paused. This is the
-## core of Option 1: the live env and the training envs share the same
-## SceneTree, so running both simultaneously causes the live env to be
-## stepped by the SceneEvaluator's physics_frame awaits (at training speed),
-## making it flicker/teleport. By only driving the live env when paused, we
-## guarantee it runs at the normal 60 Hz tick rate with no interference.
+## Drive the live env every physics tick, but ONLY when paused (speed == 0).
+## During training, the live env's _physics_process is disabled via
+## set_physics_process(false), so this function is the sole driver when paused.
 func _physics_process(_delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
-        if not _paused:
+        if _speed != 0:
                 return
         _drive_live_env()
 
@@ -391,9 +413,7 @@ func _step_generation() -> void:
                         _pop.best_fitness = fitnesses[i]
                         _pop.best_genome = _pop.genomes[i].duplicate()
         # Record stats BEFORE evolve(), so we capture the actual evaluated
-        # fitnesses of this generation. If we record after evolve(), the new
-        # generation's genomes have fitness=0 (unevaluated children) except
-        # elites, making avg look degenerate and best look like a flat line.
+        # fitnesses of this generation.
         if _stats_tracker != null:
                 _stats_tracker.record(_pop)
         _pop.evolve()
@@ -402,16 +422,29 @@ func _step_generation() -> void:
         _live_idx = -1
         if _is_solved():
                 _solved = true
-                _paused = true
-                _pause_resume_btn.button_pressed = true
-                _pause_resume_btn.text = "Resume"
+                _speed = 0
+                _speed_option.selected = 0
+                _set_live_env_active(true)
+                _reset_live_env()
 
 func _is_solved() -> bool:
+        # Thresholds are set high enough that "solved" means genuinely learned
+        # the task, not "got lucky once". See notes below for each env.
         match _env_idx:
+                # XOR: max fitness = 16 (perfect). Solved at 15.5 (near-perfect).
                 0: return _pop.best_fitness >= float(_extra.get("_solved_threshold", 15.5))
-                1: return _pop.best_fitness >= float(_extra.get("_max_steps", 500)) * 0.98
-                2: return _pop.best_fitness >= 1.5  # Acrobot: tip above threshold (height > 1.0) + step bonus
-                3: return _pop.best_fitness >= float(_extra.get("_points_to_win", 5)) * 6.0  # Pong: win + hits + survival
+                # CartPole: fitness = steps survived (max 500). Solved at 500
+                # (survived the full episode). Requires genuine balancing.
+                1: return _pop.best_fitness >= float(_extra.get("_max_steps", 500))
+                # Acrobot: fitness = max_tip_y + step_bonus. Solved when the tip
+                # reaches the height threshold (max_tip_y >= 1.0) consistently.
+                # With step bonus, total is ~2.0. Require 1.8 to avoid false positives.
+                2: return _pop.best_fitness >= 1.8
+                # Pong: fitness = hits*1 + score_a*5 - score_b*2 + win_bonus + steps*0.01.
+                # Solved when the genome consistently wins matches. Require
+                # fitness >= points_to_win * 10 (e.g. 50 for 5 points) to ensure
+                # multiple wins + hits, not just survival bonus.
+                3: return _pop.best_fitness >= float(_extra.get("_points_to_win", 5)) * 10.0
                 _: return false
 
 func _update_ui() -> void:
@@ -429,7 +462,7 @@ func _update_ui() -> void:
         else:
                 var lg: Genome = _pop.genomes[_live_idx]
                 live_str = "#%d (fit=%.2f)" % [_live_idx, lg.fitness]
-        var state_str: String = "SOLVED" if _solved else ("Paused" if _paused else "Training")
+        var state_str: String = "SOLVED" if _solved else ("Paused" if _speed == 0 else "Running %dx" % _speed)
         _status_label.text = "Gen %d / %d   |   Best: %.2f   |   Species: %d   |   Live: %s   |   %s" % [
                 _pop.generation, max_gen, _pop.best_fitness,
                 _pop.species_count(), live_str, state_str,

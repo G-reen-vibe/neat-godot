@@ -17,7 +17,7 @@ extends Node
 const MainAppScene: PackedScene = preload("res://ui/main_app.tscn")
 const ENVS_TO_TEST: Array[int] = [0, 1, 2, 3]  # XOR, CartPole, Acrobot, Pong
 const TRAINING_FRAMES_XOR: int = 120  # XOR is synchronous, very fast
-const TRAINING_FRAMES_PHYSICS: int = 400  # Physics envs need ~200 physics frames per gen (no speedup)
+const TRAINING_FRAMES_PHYSICS: int = 600  # Physics envs need ~100+ physics frames per gen (no speedup)
 
 var _app: Control
 var _failed: bool = false
@@ -100,14 +100,12 @@ func _test_env(env_idx: int) -> void:
         if env_idx == 0:
                 extra["_solved_threshold"] = 15.5
         elif env_idx in [1, 2]:
-                extra["_max_steps"] = 200
+                extra["_max_steps"] = 100
                 extra["_episodes"] = 1
-                extra["_speedup"] = 2.0
         elif env_idx == 3:
                 extra["_points_to_win"] = 3
                 extra["_episodes"] = 1
-                extra["_speedup"] = 2.0
-                extra["_max_steps"] = 200
+                extra["_max_steps"] = 100
         config_screen.start_requested.emit(cfg, extra)
         await get_tree().process_frame
         await get_tree().process_frame
@@ -164,16 +162,16 @@ func _test_env(env_idx: int) -> void:
                 if reset_view: reset_view.pressed.emit()
                 await get_tree().process_frame
                 print("    viz buttons OK")
-        # 9. Test pause/resume button.
-        var pause_btn: Button = _find_node_by_name(run_screen, "PauseResumeBtn")
-        if pause_btn != null:
-                pause_btn.button_pressed = true
-                pause_btn.toggled.emit(true)
+        # 9. Test speed dropdown: pause then resume.
+        var speed_option: OptionButton = _find_node_by_name(run_screen, "SpeedOption")
+        if speed_option != null:
+                speed_option.selected = 0  # Pause
+                speed_option.item_selected.emit(0)
                 await get_tree().process_frame
-                pause_btn.button_pressed = false
-                pause_btn.toggled.emit(false)
+                speed_option.selected = 1  # 1x
+                speed_option.item_selected.emit(1)
                 await get_tree().process_frame
-                print("    pause/resume OK")
+                print("    speed control OK")
         # 10. Back to menu.
         var back_btn: Button = _find_node_by_name(run_screen, "BackBtn")
         if back_btn == null:

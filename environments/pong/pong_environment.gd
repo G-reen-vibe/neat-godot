@@ -144,14 +144,13 @@ func interpret_output(output: Dictionary) -> Dictionary:
         return {"a": a_action}
 
 ## Apply both players' actions. If player_b is set, run its forward pass too.
-## Paddles are StaticBody2D, so we move them by setting position directly.
-## Movement uses the physics delta so speed is correct at any tick rate.
+## Paddles are AnimatableBody2D, moved by setting position directly.
+## Uses fixed dt = 1/60 (physics tick rate is always 60 Hz, no speedup).
 func apply_action(action: Dictionary) -> void:
         if _done:
                 return
-        var dt: float = get_physics_process_delta_time()
+        var dt: float = 1.0 / 60.0
         var a_action: float = float(action.get("a", 0.0))
-        # Move paddle A by directly setting position (StaticBody2D has no velocity).
         _paddle_a.position.y += clampf(a_action, -1.0, 1.0) * PADDLE_SPEED * dt
         # Move paddle B (if opponent exists).
         if player_b != null:
