@@ -77,6 +77,13 @@ func _ready() -> void:
 func set_max_steps(p: int) -> void:
         _max_steps = p
 
+## Freeze/unfreeze the ball RigidBody2D. Paddles are AnimatableBody2D (not
+## frozen — they don't move unless we set their position). Used by RunScreen
+## to prevent the live env's ball from being affected by SceneEvaluator
+## physics steps during training.
+func set_bodies_frozen(frozen: bool) -> void:
+        _ball.freeze = frozen
+
 func set_player_a(g: Genome) -> void:
         player_a = g
 

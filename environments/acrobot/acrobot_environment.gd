@@ -43,122 +43,129 @@ var _initial_link2_pos: Vector2
 var _initial_link2_rot: float
 
 func _ready() -> void:
-	_initial_link1_pos = _link1.position
-	_initial_link1_rot = _link1.rotation
-	_initial_link2_pos = _link2.position
-	_initial_link2_rot = _link2.rotation
+        _initial_link1_pos = _link1.position
+        _initial_link1_rot = _link1.rotation
+        _initial_link2_pos = _link2.position
+        _initial_link2_rot = _link2.rotation
 
 func set_max_steps(p_max_steps: int) -> void:
-	_max_steps = p_max_steps
+        _max_steps = p_max_steps
+
+## Freeze/unfreeze the link RigidBody2Ds. When frozen, the bodies won't move
+## even when the physics server steps the world. Used by RunScreen to prevent
+## the live env from being affected by SceneEvaluator physics steps.
+func set_bodies_frozen(frozen: bool) -> void:
+        _link1.freeze = frozen
+        _link2.freeze = frozen
 
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
-	super.reset(p_genome, rng)
-	_steps = 0
-	_done = false
-	_max_tip_y = -1e9
-	_link1.position = _initial_link1_pos
-	_link1.rotation = _initial_link1_rot
-	_link1.linear_velocity = Vector2.ZERO
-	_link1.angular_velocity = 0.0
-	_link2.position = _initial_link2_pos
-	_link2.rotation = _initial_link2_rot
-	_link2.linear_velocity = Vector2.ZERO
-	_link2.angular_velocity = 0.0
-	if rng != null:
-		_link1.rotation = rng.randf_range(-0.1, 0.1)
-		_link2.rotation = rng.randf_range(-0.1, 0.1)
+        super.reset(p_genome, rng)
+        _steps = 0
+        _done = false
+        _max_tip_y = -1e9
+        _link1.position = _initial_link1_pos
+        _link1.rotation = _initial_link1_rot
+        _link1.linear_velocity = Vector2.ZERO
+        _link1.angular_velocity = 0.0
+        _link2.position = _initial_link2_pos
+        _link2.rotation = _initial_link2_rot
+        _link2.linear_velocity = Vector2.ZERO
+        _link2.angular_velocity = 0.0
+        if rng != null:
+                _link1.rotation = rng.randf_range(-0.1, 0.1)
+                _link2.rotation = rng.randf_range(-0.1, 0.1)
 
 func get_state() -> Dictionary:
-	var theta1: float = _link1.rotation
-	var theta2: float = _link2.rotation - _link1.rotation
-	var d: Dictionary = {}
-	d[input_node_ids[0]] = cos(theta1)
-	d[input_node_ids[1]] = sin(theta1)
-	d[input_node_ids[2]] = cos(theta2)
-	d[input_node_ids[3]] = sin(theta2)
-	d[input_node_ids[4]] = _link1.angular_velocity
-	d[input_node_ids[5]] = _link2.angular_velocity - _link1.angular_velocity
-	return d
+        var theta1: float = _link1.rotation
+        var theta2: float = _link2.rotation - _link1.rotation
+        var d: Dictionary = {}
+        d[input_node_ids[0]] = cos(theta1)
+        d[input_node_ids[1]] = sin(theta1)
+        d[input_node_ids[2]] = cos(theta2)
+        d[input_node_ids[3]] = sin(theta2)
+        d[input_node_ids[4]] = _link1.angular_velocity
+        d[input_node_ids[5]] = _link2.angular_velocity - _link1.angular_velocity
+        return d
 
 func interpret_output(output: Dictionary) -> Dictionary:
-	var v: float = float(output.get(output_node_id, 0.0))
-	var a: int = 0
-	if v > 0.33:
-		a = 1
-	elif v < -0.33:
-		a = -1
-	return {"action": a}
+        var v: float = float(output.get(output_node_id, 0.0))
+        var a: int = 0
+        if v > 0.33:
+                a = 1
+        elif v < -0.33:
+                a = -1
+        return {"action": a}
 
 func apply_action(action: Dictionary) -> void:
-	if _done:
-		return
-	var a: int = int(action.get("action", 0))
-	var torque: float = float(a) * TORQUE_MAG
-	# Apply torque to link2 (and reaction to link1).
-	# In Godot 2D, apply_torque_impulse adds an instantaneous angular impulse.
-	# We use apply_torque for continuous torque (applied over next physics step).
-	_link2.apply_torque(torque * SUBSTEPS_PER_ACTION)
-	_link1.apply_torque(-torque * SUBSTEPS_PER_ACTION)
+        if _done:
+                return
+        var a: int = int(action.get("action", 0))
+        var torque: float = float(a) * TORQUE_MAG
+        # Apply torque to link2 (and reaction to link1).
+        # In Godot 2D, apply_torque_impulse adds an instantaneous angular impulse.
+        # We use apply_torque for continuous torque (applied over next physics step).
+        _link2.apply_torque(torque * SUBSTEPS_PER_ACTION)
+        _link1.apply_torque(-torque * SUBSTEPS_PER_ACTION)
 
 func is_done() -> bool:
-	return _done
+        return _done
 
 func _physics_process(_delta: float) -> void:
-	if _done:
-		return
-	_steps += 1
-	# Clip angular velocities.
-	_link1.angular_velocity = clampf(_link1.angular_velocity, -MAX_VEL_1, MAX_VEL_1)
-	_link2.angular_velocity = clampf(_link2.angular_velocity, -MAX_VEL_2, MAX_VEL_2)
-	# Compute tip y. theta1=0 means link1 hangs straight down (-y in Godot).
-	# Link1's tip (bottom) is at: anchor_pos + (sin(theta1), cos(theta1)) * L1
-	# Link2's tip is at: link1_tip + (sin(theta1+theta2), cos(theta1+theta2)) * L2
-	# In Godot +y is DOWN, so "above the anchor" means tip y < anchor y.
-	# Tip y (world) = anchor_y + cos(theta1)*L1 + cos(theta1+theta2)*L2 (both positive when hanging down).
-	# "Height above anchor" = -(tip_y - anchor_y) = -cos(theta1)*L1 - cos(theta1+theta2)*L2.
-	var theta1: float = _link1.rotation
-	var theta2: float = _link2.rotation - _link1.rotation
-	var tip_y_world: float = position.y + cos(theta1) * LINK_LENGTH_1 + cos(theta1 + theta2) * LINK_LENGTH_2
-	# Height above anchor (positive = above).
-	var height_above: float = position.y - tip_y_world
-	if height_above > _max_tip_y:
-		_max_tip_y = height_above
-	if height_above > HEIGHT_THRESHOLD:
-		_done = true
-	elif _steps >= _max_steps:
-		_done = true
+        if _done:
+                return
+        _steps += 1
+        # Clip angular velocities.
+        _link1.angular_velocity = clampf(_link1.angular_velocity, -MAX_VEL_1, MAX_VEL_1)
+        _link2.angular_velocity = clampf(_link2.angular_velocity, -MAX_VEL_2, MAX_VEL_2)
+        # Compute tip y. theta1=0 means link1 hangs straight down (-y in Godot).
+        # Link1's tip (bottom) is at: anchor_pos + (sin(theta1), cos(theta1)) * L1
+        # Link2's tip is at: link1_tip + (sin(theta1+theta2), cos(theta1+theta2)) * L2
+        # In Godot +y is DOWN, so "above the anchor" means tip y < anchor y.
+        # Tip y (world) = anchor_y + cos(theta1)*L1 + cos(theta1+theta2)*L2 (both positive when hanging down).
+        # "Height above anchor" = -(tip_y - anchor_y) = -cos(theta1)*L1 - cos(theta1+theta2)*L2.
+        var theta1: float = _link1.rotation
+        var theta2: float = _link2.rotation - _link1.rotation
+        var tip_y_world: float = position.y + cos(theta1) * LINK_LENGTH_1 + cos(theta1 + theta2) * LINK_LENGTH_2
+        # Height above anchor (positive = above).
+        var height_above: float = position.y - tip_y_world
+        if height_above > _max_tip_y:
+                _max_tip_y = height_above
+        if height_above > HEIGHT_THRESHOLD:
+                _done = true
+        elif _steps >= _max_steps:
+                _done = true
 
 func current_fitness() -> float:
-	var step_component: float = float(_max_steps - _steps) / float(_max_steps)
-	return _max_tip_y + step_component
+        var step_component: float = float(_max_steps - _steps) / float(_max_steps)
+        return _max_tip_y + step_component
 
 func is_solved() -> bool:
-	return _max_tip_y > HEIGHT_THRESHOLD
+        return _max_tip_y > HEIGHT_THRESHOLD
 
 func state() -> Array[float]:
-	var theta1: float = _link1.rotation
-	var theta2: float = _link2.rotation - _link1.rotation
-	return [theta1, theta2, _link1.angular_velocity, _link2.angular_velocity - _link1.angular_velocity]
+        var theta1: float = _link1.rotation
+        var theta2: float = _link2.rotation - _link1.rotation
+        return [theta1, theta2, _link1.angular_velocity, _link2.angular_velocity - _link1.angular_velocity]
 
 func get_visual_state() -> Dictionary:
-	var theta1: float = _link1.rotation
-	var theta2: float = _link2.rotation - _link1.rotation
-	var tip_y_world: float = position.y + cos(theta1) * LINK_LENGTH_1 + cos(theta1 + theta2) * LINK_LENGTH_2
-	return {
-		"theta1": theta1,
-		"theta2": theta2,
-		"theta1_dot": _link1.angular_velocity,
-		"theta2_dot": _link2.angular_velocity - _link1.angular_velocity,
-		"steps": _steps,
-		"max_steps": _max_steps,
-		"done": _done,
-		"tip_y": position.y - tip_y_world,
-		"max_tip_y": _max_tip_y,
-		"height_threshold": HEIGHT_THRESHOLD,
-		"link_length_1": LINK_LENGTH_1,
-		"link_length_2": LINK_LENGTH_2,
-		"link1_pos": _link1.position,
-		"link2_pos": _link2.position,
-		"link1_rot": _link1.rotation,
-		"link2_rot": _link2.rotation,
-	}
+        var theta1: float = _link1.rotation
+        var theta2: float = _link2.rotation - _link1.rotation
+        var tip_y_world: float = position.y + cos(theta1) * LINK_LENGTH_1 + cos(theta1 + theta2) * LINK_LENGTH_2
+        return {
+                "theta1": theta1,
+                "theta2": theta2,
+                "theta1_dot": _link1.angular_velocity,
+                "theta2_dot": _link2.angular_velocity - _link1.angular_velocity,
+                "steps": _steps,
+                "max_steps": _max_steps,
+                "done": _done,
+                "tip_y": position.y - tip_y_world,
+                "max_tip_y": _max_tip_y,
+                "height_threshold": HEIGHT_THRESHOLD,
+                "link_length_1": LINK_LENGTH_1,
+                "link_length_2": LINK_LENGTH_2,
+                "link1_pos": _link1.position,
+                "link2_pos": _link2.position,
+                "link1_rot": _link1.rotation,
+                "link2_rot": _link2.rotation,
+        }

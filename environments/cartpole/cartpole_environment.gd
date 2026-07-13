@@ -49,6 +49,14 @@ func _ready() -> void:
 func set_max_steps(p_max_steps: int) -> void:
         _max_steps = p_max_steps
 
+## Freeze/unfreeze the cart and pole RigidBody2Ds. When frozen, the bodies
+## won't move even when the physics server steps the world. This is used by
+## the RunScreen to prevent the live env from being affected by the
+## SceneEvaluator's physics_frame awaits during training.
+func set_bodies_frozen(frozen: bool) -> void:
+        _cart.freeze = frozen
+        _pole.freeze = frozen
+
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
         super.reset(p_genome, rng)
         _steps = 0

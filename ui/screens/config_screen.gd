@@ -501,7 +501,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         return c
 
 func _make_extra(env_idx: int) -> Dictionary:
-        var d: Dictionary = {"_max_generations": 200}
+        var d: Dictionary = {"_max_generations": 999999}
         match env_idx:
                 0: d["_solved_threshold"] = 15.5
                 1:
