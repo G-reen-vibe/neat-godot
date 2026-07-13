@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestadaptbw01"]
+
+[ext_resource type="Script" path="res://tests/test_adapter_bipedal_walker.gd" id="1_t"]
+
+[node name="TestAdapterBipedalWalker" type="Node"]
+script = ExtResource("1_t")

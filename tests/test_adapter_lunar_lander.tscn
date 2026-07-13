@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestadaptll01"]
+
+[ext_resource type="Script" path="res://tests/test_adapter_lunar_lander.gd" id="1_t"]
+
+[node name="TestAdapterLunarLander" type="Node"]
+script = ExtResource("1_t")

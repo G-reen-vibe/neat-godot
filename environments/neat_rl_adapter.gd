@@ -48,6 +48,20 @@ var _secondary_agents: Array[RLAgent] = []
 ## Accumulated fitness (cumulative reward from the primary agent).
 var _cumulative_fitness: float = 0.0
 
+## Set to true by reset(), cleared on the next step_env(). When true, step_env
+## skips the RL env's physics_step + reward accumulation for that one frame.
+## This is needed because the teleport queued by reset() applies during the
+## physics server's step (which runs AFTER _physics_process in Godot 4's
+## physics frame). Without this skip, the first step_env after reset reads
+## stale body positions (pre-teleport), which can trigger false scoring in
+## envs like Pong (ball still past the boundary -> another score detected).
+var _reset_pending: bool = false
+
+## Set by step_env() to indicate whether this step was skipped (due to
+## _reset_pending or null _rl_env). Subclasses that override step_env()
+## should check this after calling super.step_env() and return early if true.
+var _step_skipped: bool = false
+
 ## Max steps per episode. Set by env_setup_fn via [method set_max_steps].
 ## Defaults to 0 meaning "use the RL env's own max_steps".
 var _neat_max_steps: int = 0
@@ -99,6 +113,7 @@ func set_max_steps(p_max_steps: int) -> void:
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
         super.reset(p_genome, rng)
         _cumulative_fitness = 0.0
+        _reset_pending = true
         # Seed the global RNG from our per-genome-per-episode RNG so the RL env's
         # randf_range calls (in agent.reset() and env._on_reset()) are deterministic
         # per genome + episode. This is the minimal way to make the godot_rl envs
@@ -145,21 +160,25 @@ func apply_action(action: Dictionary) -> void:
 
 
 func step_env() -> void:
+        _step_skipped = false
         if _rl_env == null:
+                _step_skipped = true
+                return
+        # Skip the first step after reset. The teleport queued by reset() applies
+        # during the physics server's step, which may not have run yet when this
+        # _physics_process fires (Godot 4's physics frame order can vary). Without
+        # this skip, _on_physics_step reads stale body positions and can trigger
+        # false scoring (e.g. Pong ball still past the boundary).
+        if _reset_pending:
+                _reset_pending = false
+                _step_skipped = true
                 return
         # Advance the RL env's per-step game logic (scoring, ball speed
         # normalization, etc.). physics_step increments _step_count and calls
-        # _on_physics_step. This runs AFTER the physics engine integrated forces
-        # for this frame (Godot calls _physics_process after integration).
+        # _on_physics_step.
         _rl_env.physics_step(get_physics_process_delta_time())
         # Accumulate the primary agent's per-step reward. All godot_rl agents
         # return a per-step reward (not a running total), so we add the raw value.
-        # For agents whose get_reward() computes live from physics state
-        # (cartpole, pong, lunar_lander), this reads the current step's reward.
-        # For agents whose get_reward() returns a _cached_reward updated by their
-        # own _physics_process (bipedal_walker), this reads the PREVIOUS step's
-        # reward (1-frame lag, because parent _physics_process fires before child).
-        # The 1-frame lag is acceptable: missing 1 reward out of ~500 is noise.
         if _primary_agent != null:
                 _cumulative_fitness += _primary_agent.get_reward()
 
