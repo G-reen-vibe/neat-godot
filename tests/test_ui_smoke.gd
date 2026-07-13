@@ -9,11 +9,10 @@ extends Node
 ##   2. Each env card can be clicked -> config screen appears
 ##   3. Start Training -> Run screen appears
 ##   4. Training runs for a few generations (no errors)
-##   5. Pause/Resume works
-##   6. Speed change works
-##   7. Tab switching works
-##   8. Back to menu works
-##   9. Save/Load UI works
+##   5. Speed change via dropdown works
+##   6. Tab switching works
+##   7. Back to menu works
+##   8. Save/Load UI works
 
 const MainAppScene: PackedScene = preload("res://ui/main_app.tscn")
 const ENVS_TO_TEST: Array[int] = [0, 1, 2, 3]  # XOR, CartPole, Acrobot, Pong
@@ -28,8 +27,6 @@ func _ready() -> void:
         print("=== test_ui_smoke: UI smoke test ===")
         # Capture script errors.
         ProjectSettings.set_setting("debug/settings/gdscript/warnings/untyped_declaration", 0)
-        # Connect to script error signal.
-        var tree := get_tree()
         # Load the main app.
         _app = MainAppScene.instantiate()
         add_child(_app)
@@ -121,15 +118,7 @@ func _test_env(env_idx: int) -> void:
                 _fail("run_screen not visible after starting training for env %d" % env_idx)
                 return
         print("    run screen OK")
-        # 5. Toggle pause on.
-        var run_pause_btn: Button = _find_node_by_name(run_screen, "RunPauseBtn")
-        if run_pause_btn == null:
-                _fail("RunPauseBtn not found")
-                return
-        run_pause_btn.set_pressed(true)
-        run_pause_btn.pressed.emit()
-        await get_tree().process_frame
-        # 6. Let it train for a few seconds.
+        # 5. Training auto-runs at default speed (1x). Let it train for a few seconds.
         var last_gen: int = -1
         for i in range(TRAINING_FRAMES_PER_ENV):
                 await get_tree().process_frame
@@ -142,7 +131,7 @@ func _test_env(env_idx: int) -> void:
                                 print("    [frame %d] gen=%d best=%.3f" % [i + 1, p.generation, p.best_fitness])
                                 if p.generation > last_gen:
                                         last_gen = p.generation
-        # 7. Check that training made progress (generation > 0 OR solved).
+        # 6. Check that training made progress (generation > 0 OR solved).
         var pop: Population = run_screen.get_population()
         if pop == null:
                 _fail("run_screen.get_population() returned null for env %d" % env_idx)
@@ -152,7 +141,7 @@ func _test_env(env_idx: int) -> void:
                 return
         print("    training OK: gen=%d best=%.3f species=%d" % [pop.generation, pop.best_fitness, pop.species_count()])
         _results.append("%s: gen=%d best=%.3f species=%d" % [env_name, pop.generation, pop.best_fitness, pop.species_count()])
-        # 8. Switch tabs (Stats, SaveLoad, back to Genome).
+        # 7. Switch tabs (Stats, SaveLoad, back to Genome).
         var right_tabs: TabContainer = _find_node_by_name(run_screen, "RightTabs")
         if right_tabs != null:
                 right_tabs.current_tab = 1  # Stats
@@ -162,22 +151,35 @@ func _test_env(env_idx: int) -> void:
                 right_tabs.current_tab = 0  # Genome
                 await get_tree().process_frame
                 print("    tab switching OK")
-        # 9. Test visualization buttons (for non-XOR).
+        # 8. Test visualization buttons (for non-XOR).
         if env_idx != 0:
                 var zoom_in: Button = _find_node_by_name(run_screen, "ZoomInBtn")
                 var zoom_out: Button = _find_node_by_name(run_screen, "ZoomOutBtn")
                 var reset_view: Button = _find_node_by_name(run_screen, "ResetViewBtn")
-                var follow: Button = _find_node_by_name(run_screen, "FollowBtn")
                 if zoom_in: zoom_in.pressed.emit()
                 if zoom_out: zoom_out.pressed.emit()
                 if reset_view: reset_view.pressed.emit()
-                if follow: follow.set_pressed(not follow.button_pressed)
                 await get_tree().process_frame
                 print("    viz buttons OK")
-        # 10. Pause training.
-        run_pause_btn.set_pressed(false)
-        run_pause_btn.pressed.emit()
-        await get_tree().process_frame
+        # 9. Test speed dropdown: pause then resume.
+        var speed_option: OptionButton = _find_node_by_name(run_screen, "SpeedOption")
+        if speed_option != null:
+                speed_option.selected = 0  # Pause
+                speed_option.item_selected.emit(0)
+                await get_tree().process_frame
+                speed_option.selected = 1  # 1x
+                speed_option.item_selected.emit(1)
+                await get_tree().process_frame
+                print("    speed control OK")
+        # 10. Test speed up/down buttons.
+        var speed_down: Button = _find_node_by_name(run_screen, "SpeedDownBtn")
+        var speed_up: Button = _find_node_by_name(run_screen, "SpeedUpBtn")
+        if speed_down and speed_up:
+                speed_down.pressed.emit()
+                await get_tree().process_frame
+                speed_up.pressed.emit()
+                await get_tree().process_frame
+                print("    speed buttons OK")
         # 11. Back to menu.
         var back_btn: Button = _find_node_by_name(run_screen, "BackBtn")
         if back_btn == null:

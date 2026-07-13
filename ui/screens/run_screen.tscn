@@ -51,36 +51,37 @@ custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
 text = "Config"
 
-[node name="RestartBtn" type="Button" parent="MainSplit/Left/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(80, 32)
-layout_mode = 2
-text = "Restart"
-
-[node name="RunPauseBtn" type="Button" parent="MainSplit/Left/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(90, 32)
-layout_mode = 2
-toggle_mode = true
-text = "Run"
-
 [node name="SpeedLabel" type="Label" parent="MainSplit/Left/Header"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.72, 1)
 theme_override_font_sizes/font_size = 12
 text = "Speed:"
 
+[node name="SpeedDownBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(28, 32)
+layout_mode = 2
+text = "<"
+
 [node name="SpeedOption" type="OptionButton" parent="MainSplit/Left/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(70, 32)
+custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
-item_count = 6
-popup/item_0/text = "1x"
-popup/item_1/text = "2x"
-popup/item_2/text = "5x"
-popup/item_3/text = "10x"
-popup/item_4/text = "25x"
-popup/item_5/text = "50x"
+item_count = 7
+popup/item_0/text = "Pause"
+popup/item_1/text = "1x"
+popup/item_2/text = "2x"
+popup/item_3/text = "5x"
+popup/item_4/text = "10x"
+popup/item_5/text = "25x"
+popup/item_6/text = "50x"
+selected = 1
+
+[node name="SpeedUpBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(28, 32)
+layout_mode = 2
+text = ">"
 
 [node name="StatusLabel" type="Label" parent="MainSplit/Left/Header"]
 unique_name_in_owner = true
@@ -105,14 +106,6 @@ text = "SOLVED!"
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
-
-[node name="FollowBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(70, 28)
-layout_mode = 2
-toggle_mode = true
-button_pressed = true
-text = "Follow"
 
 [node name="ZoomInBtn" type="Button" parent="MainSplit/Left/VizToolbar"]
 unique_name_in_owner = true
@@ -150,7 +143,7 @@ size_flags_horizontal = 3
 clip_text = true
 theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "P/Run=pause  Space=step once  ESC=back"
+text = "Speed=Pause to halt training  |  N=next genome  B=best genome  |  WASD=pan camera  +/-/0=zoom"
 
 [node name="RightTabs" type="TabContainer" parent="MainSplit"]
 unique_name_in_owner = true

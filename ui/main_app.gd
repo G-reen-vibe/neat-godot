@@ -67,16 +67,4 @@ func _on_start_training(config: NeatConfig, extra: Dictionary) -> void:
         _run_screen.config_requested.connect(func():
                 _config_screen.configure_for_env(_env_idx)
                 _show_screen(Screen.CONFIG))
-        _run_screen.restart_requested.connect(_on_restart)
         _show_screen(Screen.RUN)
-
-func _on_restart() -> void:
-        if _run_screen == null:
-                return
-        # Stop training before re-setup.
-        _run_screen.request_stop()
-        var config: NeatConfig = _run_screen.get_config()
-        var extra: Dictionary = _run_screen.get_extra()
-        var pop := Population.new(config)
-        pop.initialize()
-        _run_screen.setup(_env_idx, config, extra, pop)

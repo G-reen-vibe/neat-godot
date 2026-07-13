@@ -1,22 +1,27 @@
 ## Training screen: shows live env visualization + graph + stats + save/load.
 ##
-## Layout:
+## Left panel layout (this file):
 ##   HSplitContainer
 ##     Left (stretch=1.0):
 ##       VBox
-##         Header (toolbar: back, config, restart, run/pause, speed, status)
-##         VizContainer (env viewport with overlay controls)
+##         Header (toolbar: back, config, speed down/dropdown/up, status, solved)
+##         VizToolbar (zoom in/out, reset view)
+##         VizContainer (env viewport or XOR truth table)
 ##         HelpBar (key hints)
 ##     Right (fixed 420px):
-##       TabContainer (Genome / Stats / Save-Load)
+##       TabContainer (Genome / Stats / Save-Load)  -- managed by another agent
 ##
-## All children use container-friendly layout (no anchors inside containers).
+## Training is controlled purely by the Speed dropdown:
+##   - "Pause" (speed=0) halts training; the live env keeps replaying.
+##   - "1x".."50x" runs N generations per frame.
+## There is no Run/Pause button and no Restart button. The live visualization
+## always plays with the currently-selected "live genome" (default = best genome).
+## N/B cycle the live genome shown in the visualization (not the graph).
 extends MarginContainer
 class_name RunScreen
 
 signal back_requested()
 signal config_requested()
-signal restart_requested()
 
 const GraphVisualizerScene: PackedScene = preload("res://ui/components/graph_visualizer.tscn")
 const TrainingStatsViewScene: PackedScene = preload("res://ui/components/training_stats_view.tscn")
@@ -25,13 +30,15 @@ const EnvViewportScene: PackedScene = preload("res://ui/components/env_viewport.
 const XorTruthTableScene: PackedScene = preload("res://ui/components/xor_truth_table.tscn")
 
 # Speed presets: index in OptionButton -> generations per frame.
-const SPEED_PRESETS: Array[int] = [1, 2, 5, 10, 25, 50]
+# Index 0 is Pause (speed=0); indices 1..6 are 1x..50x.
+const SPEED_PRESETS: Array[int] = [0, 1, 2, 5, 10, 25, 50]
+const DEFAULT_SPEED_INDEX: int = 1  # 1x
 
 @onready var _back_btn: Button = %BackBtn
 @onready var _config_btn: Button = %ConfigBtn
-@onready var _restart_btn: Button = %RestartBtn
-@onready var _run_pause_btn: Button = %RunPauseBtn
+@onready var _speed_down_btn: Button = %SpeedDownBtn
 @onready var _speed_option: OptionButton = %SpeedOption
+@onready var _speed_up_btn: Button = %SpeedUpBtn
 @onready var _status_label: Label = %StatusLabel
 @onready var _solved_label: Label = %SolvedLabel
 @onready var _viz_container: PanelContainer = %VizContainer
@@ -40,7 +47,6 @@ const SPEED_PRESETS: Array[int] = [1, 2, 5, 10, 25, 50]
 @onready var _genome_tab: PanelContainer = %Genome
 @onready var _stats_tab: PanelContainer = %Stats
 @onready var _save_load_tab: PanelContainer = %Saving
-@onready var _follow_btn: Button = %FollowBtn
 @onready var _zoom_in_btn: Button = %ZoomInBtn
 @onready var _zoom_out_btn: Button = %ZoomOutBtn
 @onready var _reset_view_btn: Button = %ResetViewBtn
@@ -57,25 +63,34 @@ var _extra: Dictionary = {}
 var _env_idx: int = -1
 var _env_scene: PackedScene = null
 var _view_type: String = "2d"
-var _auto_run: bool = false
 var _solved: bool = false
 var _speed: int = 1
 var _stepping: bool = false
 var _evaluator: Variant = null  # Evaluator or SceneEvaluator
 var _stats_tracker: TrainingStatsTracker = null
 var _live_env: Node = null
+# Set to true when the RunScreen is being freed; lets in-flight coroutines
+# bail out instead of touching the disposed evaluator / freed node.
+var _disposing: bool = false
+
+# Live genome: the genome currently shown in the visualization (env replay
+# or XOR truth table). Defaults to the population's best genome. N cycles
+# forward through pop.genomes; B resets to best.
+var _live_is_best: bool = true
+var _live_idx: int = -1  # index into pop.genomes; -1 means "best"
 
 func _ready() -> void:
         _back_btn.pressed.connect(func(): back_requested.emit())
         _config_btn.pressed.connect(func(): config_requested.emit())
-        _restart_btn.pressed.connect(func(): restart_requested.emit())
-        _run_pause_btn.pressed.connect(_toggle_pause)
-        _speed_option.item_selected.connect(func(idx): _speed = SPEED_PRESETS[mini(idx, SPEED_PRESETS.size() - 1)])
-        _follow_btn.toggled.connect(_on_follow_toggled)
+        _speed_option.item_selected.connect(_on_speed_index_changed)
+        _speed_down_btn.pressed.connect(_on_speed_down)
+        _speed_up_btn.pressed.connect(_on_speed_up)
         _zoom_in_btn.pressed.connect(func(): _adjust_zoom(1.25))
         _zoom_out_btn.pressed.connect(func(): _adjust_zoom(1.0 / 1.25))
         _reset_view_btn.pressed.connect(_on_reset_view)
-        # Build the right-tab children.
+        # Initialize speed from the OptionButton's default selection.
+        _speed = SPEED_PRESETS[_speed_option.selected]
+        # Build the right-tab children (managed by another agent; we only host them).
         _visualizer = GraphVisualizerScene.instantiate()
         _genome_tab.add_child(_visualizer)
         _stats_view = TrainingStatsViewScene.instantiate()
@@ -89,9 +104,8 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _extra = extra
         _pop = pop
         _solved = false
-        _auto_run = false
-        _run_pause_btn.text = "Run"
-        _run_pause_btn.button_pressed = false
+        _live_is_best = true
+        _live_idx = -1
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
         _stats_tracker.set_config_snapshot(config)
@@ -114,7 +128,7 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
                 3:
                         _env_scene = load("res://environments/pong/pong_environment.tscn")
                         _view_type = "2d"
-        _setup_visualization()
+        await _setup_visualization()
         _setup_evaluator()
         _update_ui()
 
@@ -127,16 +141,16 @@ func _setup_visualization() -> void:
                 _xor_table = XorTruthTableScene.instantiate()
                 _viz_container.add_child(_xor_table)
                 # Hide camera buttons for XOR (no spatial visualization).
-                _follow_btn.visible = false
                 _zoom_in_btn.visible = false
                 _zoom_out_btn.visible = false
                 _reset_view_btn.visible = false
+                _xor_table.genome = _live_genome()
         elif _env_scene != null:
                 _env_viewport = EnvViewportScene.instantiate()
                 _viz_container.add_child(_env_viewport)
                 _env_viewport.set_env_scene(_env_scene, _view_type)
                 _live_env = _env_viewport.env
-                # Configure the live env's IO so the best genome can drive it.
+                # Configure the live env's IO so the live genome can drive it.
                 if _live_env != null and _live_env.has_method("set_max_steps"):
                         _live_env.set_max_steps(int(_extra.get("_max_steps", 500)))
                 # Apply the same setup function used by the evaluator.
@@ -146,12 +160,10 @@ func _setup_visualization() -> void:
                 # Reset the live env with a fixed seed for consistent visualization.
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
-                _env_viewport.reset_env(null, rng)
-                _follow_btn.visible = true
+                _env_viewport.reset_env(_live_genome(), rng)
                 _zoom_in_btn.visible = true
                 _zoom_out_btn.visible = true
                 _reset_view_btn.visible = true
-                _follow_btn.button_pressed = _env_viewport.is_auto_follow()
 
 func _setup_evaluator() -> void:
         # Dispose any previous evaluator (frees its SubViewports).
@@ -177,7 +189,9 @@ func _dispose_evaluator() -> void:
         _evaluator = null
 
 func _exit_tree() -> void:
-        # Clean up the evaluator when the RunScreen is freed.
+        # Mark as disposing first so in-flight coroutines bail out, then clean
+        # up the evaluator (frees its SubViewports).
+        _disposing = true
         _dispose_evaluator()
 
 func _make_xor_env() -> XorEnvironment:
@@ -216,89 +230,143 @@ func _make_env_setup_fn() -> Callable:
                                 env.set_forward_mode(fwd_mode)
         return Callable()
 
-func _toggle_pause() -> void:
-        _auto_run = not _auto_run
-        _run_pause_btn.text = "Pause" if _auto_run else "Run"
-        _run_pause_btn.button_pressed = _auto_run
+# --- Speed control ---
 
-## Stop training immediately (used before restart / leaving the screen).
-func request_stop() -> void:
-        _auto_run = false
-        _run_pause_btn.text = "Run"
-        _run_pause_btn.button_pressed = false
+func _on_speed_index_changed(idx: int) -> void:
+        idx = clampi(idx, 0, SPEED_PRESETS.size() - 1)
+        _speed = SPEED_PRESETS[idx]
+
+func _on_speed_down() -> void:
+        var idx: int = _speed_option.selected
+        if idx > 0:
+                _speed_option.selected = idx - 1
+                _on_speed_index_changed(idx - 1)
+
+func _on_speed_up() -> void:
+        var idx: int = _speed_option.selected
+        if idx < SPEED_PRESETS.size() - 1:
+                _speed_option.selected = idx + 1
+                _on_speed_index_changed(idx + 1)
+
+# --- Live genome selection (N / B keys) ---
+
+## Returns the genome currently shown in the visualization.
+func _live_genome() -> Genome:
+        if _pop == null:
+                return null
+        if _live_is_best or _live_idx < 0 or _live_idx >= _pop.genomes.size():
+                return _pop.best_genome
+        return _pop.genomes[_live_idx]
+
+## Cycle to the next genome in pop.genomes. If currently showing best,
+## jump to genome 0. Wraps around.
+func _next_live_genome() -> void:
+        if _pop == null or _pop.genomes.is_empty():
+                return
+        if _live_is_best or _live_idx < 0 or _live_idx >= _pop.genomes.size():
+                _live_idx = 0
+        else:
+                _live_idx = (_live_idx + 1) % _pop.genomes.size()
+        _live_is_best = false
+        _reset_live_env()
+
+## Reset the live view to show the population's best genome.
+func _show_best_live_genome() -> void:
+        if _pop == null:
+                return
+        _live_is_best = true
+        _live_idx = -1
+        _reset_live_env()
+
+## Re-bind the live genome to the env viewport / XOR table and reset the
+## simulation so the new genome's behavior is shown from the start.
+func _reset_live_env() -> void:
+        var g: Genome = _live_genome()
+        if _xor_table != null and is_instance_valid(_xor_table):
+                _xor_table.genome = g
+        if _env_viewport != null and is_instance_valid(_env_viewport):
+                var rng := RandomNumberGenerator.new()
+                rng.seed = 12345
+                _env_viewport.reset_env(g, rng)
+
+# --- Input ---
 
 func _input(event: InputEvent) -> void:
-        if not (event is InputEventKey and event.pressed):
+        if not (event is InputEventKey and event.pressed and not event.echo):
                 return
         match event.keycode:
-                KEY_ESCAPE:
-                        back_requested.emit()
-                KEY_SPACE:
-                        if not _stepping and not _auto_run:
-                                _stepping = true
-                                await _step_generation()
-                                _stepping = false
-                                _update_ui()
-                KEY_P:
-                        _toggle_pause()
                 KEY_N:
-                        if _visualizer != null:
-                                _visualizer.next_genome()
+                        _next_live_genome()
+                        get_viewport().set_input_as_handled()
                 KEY_B:
-                        if _visualizer != null:
-                                _visualizer.show_best()
+                        _show_best_live_genome()
+                        get_viewport().set_input_as_handled()
+
+# --- Process loop ---
 
 func _process(_delta: float) -> void:
-        if not is_visible_in_tree():
+        if not is_visible_in_tree() or _disposing:
                 return
-        if not _auto_run or _solved or _stepping:
-                # Even when not training, drive the live env visualization.
-                _drive_live_env()
+        # Drive the live env visualization every frame, even when paused.
+        _drive_live_env()
+        # Step training when speed > 0, not solved, and not already stepping.
+        if _speed == 0 or _solved or _stepping or _disposing:
+                _update_ui()
                 return
         if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
+                _update_ui()
                 return
         _stepping = true
         var steps_this_frame: int = 0
-        while steps_this_frame < _speed and _auto_run and not _solved:
+        while steps_this_frame < _speed and _speed > 0 and not _solved and not _disposing:
                 await _step_generation()
                 steps_this_frame += 1
-                if _pop.generation >= int(_extra.get("_max_generations", 200)):
+                if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
                         break
         _stepping = false
-        _update_ui()
-        _drive_live_env()
+        if not _disposing:
+                _update_ui()
 
-## Drive the live visualization env with the best genome. This is purely for
-## display; it does NOT affect fitness (which is computed by the SceneEvaluator).
+## Drive the live visualization env with the live genome. This is purely for
+## display; it does NOT affect fitness (which is computed by the evaluator).
 func _drive_live_env() -> void:
         if _env_viewport == null or not is_instance_valid(_env_viewport):
-                return
-        if _pop == null or _pop.best_genome == null:
                 return
         if _live_env == null or not is_instance_valid(_live_env):
                 return
         if not _live_env.has_method("get_state") or not _live_env.has_method("interpret_output") or not _live_env.has_method("apply_action"):
                 return
+        var g: Genome = _live_genome()
+        if g == null:
+                return
         # Reset live env when done.
         if _live_env.has_method("is_done") and _live_env.is_done():
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
-                _env_viewport.reset_env(_pop.best_genome, rng)
+                _env_viewport.reset_env(g, rng)
                 return
-        # Apply best genome's action.
+        # Apply live genome's action.
         var state: Dictionary = _live_env.get_state()
-        var output: Dictionary = _pop.best_genome.forward(state, _config.forward_mode)
+        var output: Dictionary = g.forward(state, _config.forward_mode)
         var action: Dictionary = _live_env.interpret_output(output)
         _live_env.apply_action(action)
 
 func _step_generation() -> void:
-        if _pop == null:
+        if _pop == null or _disposing:
+                return
+        if _evaluator == null:
                 return
         var fitnesses: Array[float]
         if _evaluator is SceneEvaluator:
                 fitnesses = await (_evaluator as SceneEvaluator).evaluate_all(_pop.genomes)
-        else:
+        elif _evaluator is Evaluator:
                 fitnesses = (_evaluator as Evaluator).evaluate_all(_pop.genomes)
+        else:
+                return
+        # The evaluator may have been disposed while we were awaiting (e.g. the
+        # user clicked Back mid-generation). Bail out without touching _pop.
+        if _disposing or _pop == null or not is_instance_valid(self):
+                return
         for i in range(_pop.genomes.size()):
                 _pop.genomes[i].fitness = fitnesses[i]
                 if fitnesses[i] > _pop.best_fitness:
@@ -307,11 +375,13 @@ func _step_generation() -> void:
         _pop.evolve()
         if _stats_tracker != null:
                 _stats_tracker.record(_pop)
+        # After evolution, the live_idx may be stale (new genomes). Reset to best.
+        _live_is_best = true
+        _live_idx = -1
         if _is_solved():
                 _solved = true
-                _auto_run = false
-                _run_pause_btn.text = "Run"
-                _run_pause_btn.button_pressed = false
+                _speed = 0
+                _speed_option.selected = 0
 
 func _is_solved() -> bool:
         match _env_idx:
@@ -332,24 +402,32 @@ func _update_ui() -> void:
                 avg_nodes += g.node_count()
         avg_conns /= float(maxi(1, _pop.genomes.size()))
         avg_nodes /= float(maxi(1, _pop.genomes.size()))
-        _status_label.text = "Gen %d/%d  |  Best: %.2f  |  Species: %d  |  Nodes: %.1f  Conns: %.1f" % [
+        # Build a clear multi-part status string.
+        var live_str: String
+        if _live_is_best or _live_idx < 0 or _live_idx >= _pop.genomes.size():
+                var best_g: Genome = _pop.best_genome
+                if best_g != null:
+                        live_str = "Best (fit=%.2f)" % best_g.fitness
+                else:
+                        live_str = "Best (-)"
+        else:
+                var lg: Genome = _pop.genomes[_live_idx]
+                live_str = "#%d (fit=%.2f)" % [_live_idx, lg.fitness]
+        var state_str: String = "SOLVED" if _solved else ("Paused" if _speed == 0 else "Running")
+        _status_label.text = "Gen %d / %d   |   Best: %.2f   |   Species: %d   |   Live: %s   |   %s" % [
                 _pop.generation, max_gen, _pop.best_fitness,
-                _pop.species_count(), avg_nodes, avg_conns
+                _pop.species_count(), live_str, state_str,
         ]
         _solved_label.text = "SOLVED!" if _solved else ""
         _solved_label.visible = _solved
         _visualizer.refresh()
-        if _xor_table != null and _pop.best_genome != null:
-                _xor_table.genome = _pop.best_genome
+        if _xor_table != null and is_instance_valid(_xor_table):
+                _xor_table.genome = _live_genome()
         if _stats_view != null:
                 _stats_view.refresh()
         if _save_load_view != null:
                 _save_load_view.population = _pop
                 _save_load_view.config = _config
-
-func _on_follow_toggled(pressed: bool) -> void:
-        if _env_viewport != null and is_instance_valid(_env_viewport):
-                _env_viewport.set_auto_follow(pressed)
 
 func _adjust_zoom(factor: float) -> void:
         if _env_viewport != null and is_instance_valid(_env_viewport):
@@ -358,7 +436,6 @@ func _adjust_zoom(factor: float) -> void:
 func _on_reset_view() -> void:
         if _env_viewport != null and is_instance_valid(_env_viewport):
                 _env_viewport.reset_view()
-                _follow_btn.button_pressed = _env_viewport.is_auto_follow()
 
 func get_population() -> Population:
         return _pop
