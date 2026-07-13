@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestneatcp01"]
+
+[ext_resource type="Script" path="res://tests/test_neat_cartpole.gd" id="1_t"]
+
+[node name="TestNeatCartPole" type="Node"]
+script = ExtResource("1_t")
