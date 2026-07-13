@@ -1,6 +1,7 @@
 [gd_scene load_steps=12 format=3 uid="uid://bpong0001"]
 
 [ext_resource type="Script" uid="uid://doonfob4cipyb" path="res://environments/pong/pong_environment.gd" id="1_pong"]
+[ext_resource type="Script" path="res://environments/teleport_body_2d.gd" id="2_teleport"]
 
 [sub_resource type="RectangleShape2D" id="Shape_wall_top"]
 size = Vector2(4.2, 0.1)
@@ -45,7 +46,7 @@ shape = SubResource("Shape_wall_bot")
 
 [node name="PaddleA" type="AnimatableBody2D" parent="."]
 position = Vector2(-1.9, 0)
-sync_to_physics = true
+sync_to_physics = false
 physics_material_override = SubResource("PhysMat_paddle")
 
 [node name="PaddleAShape" type="CollisionShape2D" parent="PaddleA"]
@@ -53,7 +54,7 @@ shape = SubResource("Shape_paddle_a")
 
 [node name="PaddleB" type="AnimatableBody2D" parent="."]
 position = Vector2(1.9, 0)
-sync_to_physics = true
+sync_to_physics = false
 physics_material_override = SubResource("PhysMat_paddle")
 
 [node name="PaddleBShape" type="CollisionShape2D" parent="PaddleB"]
@@ -68,6 +69,7 @@ can_sleep = false
 contact_monitor = true
 max_contacts_reported = 8
 physics_material_override = SubResource("PhysMat_ball")
+script = ExtResource("2_teleport")
 
 [node name="BallShape" type="CollisionShape2D" parent="Ball"]
 shape = SubResource("Shape_ball")

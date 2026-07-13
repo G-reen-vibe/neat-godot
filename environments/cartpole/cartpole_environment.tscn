@@ -1,6 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://bcartpole0001"]
 
 [ext_resource type="Script" uid="uid://ce4pheryfyosx" path="res://environments/cartpole/cartpole_environment.gd" id="1_cart"]
+[ext_resource type="Script" path="res://environments/teleport_body_2d.gd" id="2_teleport"]
 
 [sub_resource type="RectangleShape2D" id="Shape_cart"]
 size = Vector2(0.4, 0.2)
@@ -30,6 +31,7 @@ axis_lock_linear_y = true
 axis_lock_angular = true
 can_sleep = false
 physics_material_override = SubResource("PhysMat_cart")
+script = ExtResource("2_teleport")
 
 [node name="CartShape" type="CollisionShape2D" parent="Cart"]
 shape = SubResource("Shape_cart")
@@ -42,6 +44,7 @@ linear_damp = 0.0
 angular_damp = 0.0
 can_sleep = false
 physics_material_override = SubResource("PhysMat_pole")
+script = ExtResource("2_teleport")
 
 [node name="PoleShape" type="CollisionShape2D" parent="Pole"]
 shape = SubResource("Shape_pole")
