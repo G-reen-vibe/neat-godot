@@ -724,8 +724,8 @@ text = "Generation Log"
 [node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/HistorySection"]
 layout_mode = 2
 
-[node name="HistoryList" type="ItemList" parent="ScrollContainer/VBox/HistorySection"]
+[node name="HistoryList" type="VBoxContainer" parent="ScrollContainer/VBox/HistorySection"]
 custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
 size_flags_vertical = 3
-fixed_column_width = 400
+theme_override_constants/separation = 1

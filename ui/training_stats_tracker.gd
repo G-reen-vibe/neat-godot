@@ -98,8 +98,11 @@ func record(pop: Population) -> void:
                 variance /= float(fitnesses.size())
                 fitness_std = sqrt(variance)
         # All-time best.
-        if pop.best_fitness > best_fitness:
+        # Skip the sentinel -1e9 (unevaluated population); use gen_best instead.
+        if pop.best_fitness > best_fitness and pop.best_fitness > -1e8:
                 best_fitness = pop.best_fitness
+        elif best_fitness <= -1e8 and gen_best_fitness > -1e8:
+                best_fitness = gen_best_fitness
         # Topology stats.
         var nodes_sum: int = 0
         var conns_sum: int = 0

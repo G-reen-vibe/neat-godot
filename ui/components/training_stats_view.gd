@@ -59,7 +59,7 @@ var tracker: TrainingStatsTracker = null:
 # Config
 @onready var _config_grid: GridContainer = $ScrollContainer/VBox/ConfigSection/ConfigGrid
 # History
-@onready var _history_list: ItemList = $ScrollContainer/VBox/HistorySection/HistoryList
+@onready var _history_list: VBoxContainer = $ScrollContainer/VBox/HistorySection/HistoryList
 
 var _refresh_counter: int = 0
 
@@ -110,14 +110,14 @@ func refresh() -> void:
         # Config
         _rebuild_config_grid()
         # History
-        _history_list.clear()
+        for c in _history_list.get_children():
+                c.queue_free()
         for entry in tracker.history:
-                _history_list.add_item(entry)
-        # Scroll to bottom (latest entry)
-        if _history_list.item_count > 0:
-                var vbar: VScrollBar = _history_list.get_v_scroll_bar()
-                if vbar != null:
-                        vbar.value = vbar.max_value
+                var lbl := Label.new()
+                lbl.text = entry
+                lbl.add_theme_color_override("font_color", COL_BODY)
+                lbl.add_theme_font_size_override("font_size", 10)
+                _history_list.add_child(lbl)
         # Charts
         _fitness_chart.queue_redraw()
         _threshold_chart.queue_redraw()
