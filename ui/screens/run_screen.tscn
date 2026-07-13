@@ -1,6 +1,5 @@
 [gd_scene load_steps=3 format=3 uid="uid://brunscreen001"]
 
-
 [ext_resource type="Script" uid="uid://dyokgyg8qnwfk" path="res://ui/screens/run_screen.gd" id="1_rs"]
 
 [sub_resource type="StyleBoxFlat" id="Style_viz_bg"]
@@ -52,6 +51,9 @@ custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
 text = "Config"
 
+[node name="Sep1" type="VSeparator" parent="MainSplit/Left/Header"]
+layout_mode = 2
+
 [node name="SpeedLabel" type="Label" parent="MainSplit/Left/Header"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.72, 1)
@@ -83,6 +85,45 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(28, 32)
 layout_mode = 2
 text = ">"
+
+[node name="Sep2" type="VSeparator" parent="MainSplit/Left/Header"]
+layout_mode = 2
+
+[node name="ColsLabel" type="Label" parent="MainSplit/Left/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.65, 0.72, 1)
+theme_override_font_sizes/font_size = 12
+text = "Cols:"
+
+[node name="ColumnsSpin" type="SpinBox" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 32)
+layout_mode = 2
+min_value = 1.0
+max_value = 20.0
+value = 8.0
+step = 1.0
+
+[node name="Sep3" type="VSeparator" parent="MainSplit/Left/Header"]
+layout_mode = 2
+
+[node name="ZoomLabel" type="Label" parent="MainSplit/Left/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.65, 0.72, 1)
+theme_override_font_sizes/font_size = 12
+text = "Zoom:"
+
+[node name="ZoomOutBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+text = "-"
+
+[node name="ZoomInBtn" type="Button" parent="MainSplit/Left/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+text = "+"
 
 [node name="StatusLabel" type="Label" parent="MainSplit/Left/Header"]
 unique_name_in_owner = true
@@ -124,7 +165,7 @@ size_flags_horizontal = 3
 clip_text = true
 theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "Grid shows all envs running in parallel during training  |  Space=toggle pause"
+text = "Space=pause  |  WASD=pan all cameras  |  +/-=zoom cells  |  Cols=grid columns"
 
 [node name="RightTabs" type="TabContainer" parent="MainSplit"]
 unique_name_in_owner = true
