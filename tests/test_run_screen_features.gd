@@ -1,10 +1,12 @@
 extends Node
 ## Test that the RunScreen's new UI features work correctly:
 ##   1. Column count SpinBox controls the grid's columns property.
-##   2. Zoom buttons change cell size + SubViewport size.
-##   3. Speed multiplier sets Engine.time_scale.
-##   4. Camera pan offset can be applied to all cameras (inside SubViewports).
-##   5. Cell labels use the godot_rl-style stat format (#idx ep:N r:N best:N).
+##   2. Zoom buttons change Camera2D.zoom (not just cell size).
+##   3. Speed multiplier sets Engine.time_scale + max_physics_steps_per_frame.
+##   4. Camera pan offset can be applied to all cameras.
+##   5. Cell labels use the godot_rl-style stat format.
+##   6. 100x and 200x speed presets exist.
+##   7. Engine settings are restored on exit.
 ##
 ## Run with:
 ##   godot --headless --path . res://tests/test_run_screen_features.tscn
@@ -71,42 +73,62 @@ func _test() -> void:
         await get_tree().process_frame
         _assert(grid.columns == 5, "grid.columns = 5 after SpinBox change (got %d)" % grid.columns)
         print("    column count: OK")
-        # --- Test 2: Zoom buttons change cell size ---
+        # --- Test 2: Zoom buttons change Camera2D.zoom ---
         var zoom_in_btn: Button = rs.find_child("ZoomInBtn", true, false)
         var zoom_out_btn: Button = rs.find_child("ZoomOutBtn", true, false)
         _assert(zoom_in_btn != null and zoom_out_btn != null, "zoom buttons found")
-        var initial_cell_size: Vector2 = grid.get_child(0).custom_minimum_size
+        # Get initial camera zoom from the first env's camera.
+        var env0: Node = rs._evaluator.get_slot_env(0)
+        var cam0: Camera2D = null
+        for c in env0.find_children("*", "Camera2D", true, false):
+                cam0 = c as Camera2D
+                break
+        _assert(cam0 != null, "found camera in env0")
+        var initial_zoom: float = cam0.zoom.x
         zoom_in_btn.pressed.emit()
         await get_tree().process_frame
-        var zoomed_in_size: Vector2 = grid.get_child(0).custom_minimum_size
-        _assert(zoomed_in_size.x > initial_cell_size.x, "cell size increased after zoom in (%.0f -> %.0f)" % [initial_cell_size.x, zoomed_in_size.x])
+        var zoomed_in: float = cam0.zoom.x
+        _assert(zoomed_in > initial_zoom, "camera zoom increased after zoom in (%.2f -> %.2f)" % [initial_zoom, zoomed_in])
         zoom_out_btn.pressed.emit()
         zoom_out_btn.pressed.emit()
         await get_tree().process_frame
-        var zoomed_out_size: Vector2 = grid.get_child(0).custom_minimum_size
-        _assert(zoomed_out_size.x < zoomed_in_size.x, "cell size decreased after zoom out (%.0f -> %.0f)" % [zoomed_in_size.x, zoomed_out_size.x])
-        print("    zoom: OK (96 -> %.0f -> %.0f)" % [zoomed_in_size.x, zoomed_out_size.x])
-        # --- Test 3: Speed multiplier sets Engine.time_scale ---
-        # Test that _on_speed_index_changed updates Engine.time_scale.
-        # (Setting OptionButton.selected from code doesn't emit item_selected
-        # in Godot 4, so we call the method directly to test the logic.)
+        var zoomed_out: float = cam0.zoom.x
+        _assert(zoomed_out < zoomed_in, "camera zoom decreased after zoom out (%.2f -> %.2f)" % [zoomed_in, zoomed_out])
+        print("    camera zoom: OK (%.2f -> %.2f -> %.2f)" % [initial_zoom, zoomed_in, zoomed_out])
+        # Verify all cameras have the same zoom.
+        for i in range(POP_SIZE):
+                var env: Node = rs._evaluator.get_slot_env(i)
+                for c in env.find_children("*", "Camera2D", true, false):
+                        var cam: Camera2D = c as Camera2D
+                        _assert(absf(cam.zoom.x - zoomed_out) < 0.01, "camera %d zoom matches (%.2f vs %.2f)" % [i, cam.zoom.x, zoomed_out])
+                        break
+        print("    all cameras zoom together: OK")
+        # --- Test 3: Speed multiplier sets Engine.physics_ticks_per_second ---
         var speed_option: OptionButton = rs.find_child("SpeedOption", true, false)
         _assert(speed_option != null, "SpeedOption found")
-        # Verify signal is connected.
         _assert(speed_option.item_selected.is_connected(rs._on_speed_index_changed), "item_selected signal connected")
         # Test 5x.
         rs._on_speed_index_changed(3)  # 5x
-        _assert(Engine.time_scale == 5.0, "Engine.time_scale = 5.0 at 5x speed (got %f)" % Engine.time_scale)
-        # Test 2x.
-        rs._on_speed_index_changed(2)  # 2x
-        _assert(Engine.time_scale == 2.0, "Engine.time_scale = 2.0 at 2x speed (got %f)" % Engine.time_scale)
-        # Test 1x.
+        _assert(Engine.physics_ticks_per_second == 300, "physics_ticks = 300 at 5x (got %d)" % Engine.physics_ticks_per_second)
+        _assert(Engine.max_physics_steps_per_frame >= 10, "max_physics_steps >= 10 at 5x (got %d)" % Engine.max_physics_steps_per_frame)
+        # Test 100x.
+        rs._on_speed_index_changed(7)  # 100x
+        _assert(Engine.physics_ticks_per_second == 6000, "physics_ticks = 6000 at 100x (got %d)" % Engine.physics_ticks_per_second)
+        _assert(Engine.max_physics_steps_per_frame >= 200, "max_physics_steps >= 200 at 100x (got %d)" % Engine.max_physics_steps_per_frame)
+        # Test 200x.
+        rs._on_speed_index_changed(8)  # 200x
+        _assert(Engine.physics_ticks_per_second == 12000, "physics_ticks = 12000 at 200x (got %d)" % Engine.physics_ticks_per_second)
+        _assert(Engine.max_physics_steps_per_frame >= 400, "max_physics_steps >= 400 at 200x (got %d)" % Engine.max_physics_steps_per_frame)
+        # Restore to 1x.
         rs._on_speed_index_changed(1)  # 1x
-        _assert(Engine.time_scale == 1.0, "Engine.time_scale = 1.0 at 1x speed (got %f)" % Engine.time_scale)
-        print("    speed multiplier: OK")
-        # --- Test 4: Camera pan offset can be applied to all cameras ---
-        # Cameras live inside SubViewports, which have separate scene trees.
-        # Access them via the SceneEvaluator's slot envs.
+        _assert(Engine.physics_ticks_per_second == 60, "physics_ticks = 60 at 1x (got %d)" % Engine.physics_ticks_per_second)
+        print("    speed multiplier + physics_ticks: OK")
+        # --- Test 4: 100x and 200x presets exist ---
+        _assert(speed_option.item_count == 9, "speed option has 9 items (got %d)" % speed_option.item_count)
+        _assert(speed_option.get_item_text(7) == "100x", "item 7 is '100x' (got '%s')" % speed_option.get_item_text(7))
+        _assert(speed_option.get_item_text(8) == "200x", "item 8 is '200x' (got '%s')" % speed_option.get_item_text(8))
+        print("    100x/200x presets: OK")
+        # --- Test 5: Camera pan offset can be applied to all cameras ---
         var cameras: Array[Camera2D] = []
         for i in range(POP_SIZE):
                 var env: Node = rs._evaluator.get_slot_env(i)
@@ -116,18 +138,15 @@ func _test() -> void:
                                 break
         _assert(not cameras.is_empty(), "found cameras in envs")
         _assert(cameras.size() == POP_SIZE, "found %d cameras (expected %d)" % [cameras.size(), POP_SIZE])
-        # Apply an offset to all cameras (simulates what WASD does via _apply_camera_offset).
         for cam in cameras:
                 cam.offset = Vector2(100, 50)
         await get_tree().process_frame
         for cam in cameras:
                 _assert(cam.offset == Vector2(100, 50), "camera offset applied to all cameras")
         print("    camera pan: OK (offset applied to %d cameras)" % cameras.size())
-        # --- Test 5: Cell labels use godot_rl-style stat format ---
-        # After _process runs _update_env_stats + _update_ui, labels should have
-        # the "ep: r: best:" format.
+        # --- Test 6: Cell labels use godot_rl-style stat format ---
         await get_tree().process_frame
-        await get_tree().process_frame  # extra frame for stats to populate
+        await get_tree().process_frame
         var lbl: Label = grid.get_child(0).get_child(1)
         _assert(lbl != null, "cell label found")
         _assert(lbl.text.find("#0") >= 0, "label has genome index: '%s'" % lbl.text)
@@ -135,6 +154,11 @@ func _test() -> void:
         _assert(lbl.text.find("r:") >= 0, "label has reward: '%s'" % lbl.text)
         _assert(lbl.text.find("best:") >= 0, "label has best: '%s'" % lbl.text)
         print("    stat reporting: OK (label='%s')" % lbl.text)
-        # Cleanup.
+        # --- Test 7: Engine settings restored on exit ---
         rs.queue_free()
         await get_tree().process_frame
+        # After freeing, _exit_tree should have restored the original settings.
+        _assert(Engine.physics_ticks_per_second == 60, "physics_ticks restored to 60 after exit (got %d)" % Engine.physics_ticks_per_second)
+        _assert(Engine.max_physics_steps_per_frame == 8, "max_physics_steps restored to 8 after exit (got %d)" % Engine.max_physics_steps_per_frame)
+        _assert(Engine.time_scale == 1.0, "time_scale restored to 1.0 after exit (got %f)" % Engine.time_scale)
+        print("    engine settings restored on exit: OK")

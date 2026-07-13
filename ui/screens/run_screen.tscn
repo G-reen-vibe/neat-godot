@@ -70,7 +70,7 @@ text = "<"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(80, 32)
 layout_mode = 2
-item_count = 7
+item_count = 9
 popup/item_0/text = "Pause"
 popup/item_1/text = "1x"
 popup/item_2/text = "2x"
@@ -78,6 +78,8 @@ popup/item_3/text = "5x"
 popup/item_4/text = "10x"
 popup/item_5/text = "25x"
 popup/item_6/text = "50x"
+popup/item_7/text = "100x"
+popup/item_8/text = "200x"
 selected = 1
 
 [node name="SpeedUpBtn" type="Button" parent="MainSplit/Left/Header"]
@@ -137,19 +139,20 @@ text = ""
 [node name="VizPanel" type="PanelContainer" parent="MainSplit/Left"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("Style_viz_bg")
 
 [node name="VizScroll" type="ScrollContainer" parent="MainSplit/Left/VizPanel"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_horizontal = 3
 clip_contents = true
-horizontal_scroll_mode = 0
+horizontal_scroll_mode = 1
 
 [node name="GridContainer" type="GridContainer" parent="MainSplit/Left/VizPanel/VizScroll"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 columns = 8
 theme_override_constants/h_separation = 2
 theme_override_constants/v_separation = 2
@@ -165,7 +168,7 @@ size_flags_horizontal = 3
 clip_text = true
 theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "Space=pause  |  WASD=pan all cameras  |  +/-=zoom cells  |  Cols=grid columns"
+text = "Space=pause  |  WASD=pan all cameras  |  +/-=zoom  |  Cols=grid columns"
 
 [node name="RightTabs" type="TabContainer" parent="MainSplit"]
 unique_name_in_owner = true

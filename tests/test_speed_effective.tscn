@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestspeedeff01"]
+
+[ext_resource type="Script" path="res://tests/test_speed_effective.gd" id="1_t"]
+
+[node name="TestSpeedEffective" type="Node"]
+script = ExtResource("1_t")

@@ -2,7 +2,7 @@
 ##
 ## Left panel layout:
 ##   HSplitContainer
-##     Left (stretch=1.0):
+##     Left (stretch=1.0, max_width constrained):
 ##       VBox
 ##         Header (toolbar: back, config, speed, columns, zoom, status)
 ##         VizPanel > VizScroll > GridContainer (env SubViewport grid)
@@ -18,14 +18,24 @@
 ##   - Each cell has a label showing the genome index, episode count, and
 ##     current episode reward (mirrors godot_rl's RLPreviewGrid labels).
 ##   - Column count is user-configurable via a SpinBox in the toolbar.
-##   - Cell size (camera zoom) is user-configurable via +/- buttons. All
-##     cameras zoom together.
+##   - Zoom buttons change Camera2D.zoom (how much of the world the camera
+##     sees) and scale cell size proportionally. All cameras zoom together.
 ##   - WASD pans all cameras together.
 ##
 ## Speed multiplier:
-##   - Uses Engine.time_scale to accelerate physics + processing. This makes
-##     training run faster in real time (more physics steps per wall-clock
-##     second). speed=0 pauses; speed=N sets Engine.time_scale = N.
+##   - Uses Engine.physics_ticks_per_second to accelerate physics. This
+##     increases the actual number of physics steps per wall-clock second,
+##     each with a proportionally smaller delta — physics quality is
+##     preserved (smaller delta = more stable integration, not less).
+##   - Engine.time_scale is NOT used because in headless mode it only
+##     inflates the delta without increasing step count, which degrades
+##     physics (tunneling, instability).
+##   - Also increases Engine.max_physics_steps_per_frame so the engine can
+##     actually run that many ticks per render frame (default cap is 8).
+##   - speed=0 pauses (physics_ticks_per_second=0); speed=N sets
+##     physics_ticks_per_second = 60 * N.
+##   - Training episodes finish faster because max_steps is in physics steps,
+##     so more steps/sec = less wall-clock time per episode = faster training.
 extends MarginContainer
 class_name RunScreen
 
@@ -37,13 +47,15 @@ const TrainingStatsViewScene: PackedScene = preload("res://ui/components/trainin
 const SaveLoadViewScene: PackedScene = preload("res://ui/components/save_load_view.tscn")
 
 # Speed presets: index in OptionButton -> Engine.time_scale value.
-# Index 0 is Pause (speed=0); indices 1..6 are 1x..50x.
-const SPEED_PRESETS: Array[float] = [0.0, 1.0, 2.0, 5.0, 10.0, 25.0, 50.0]
+# Index 0 is Pause (speed=0); indices 1..8 are 1x..200x.
+const SPEED_PRESETS: Array[float] = [0.0, 1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 100.0, 200.0]
 const DEFAULT_CELL_SIZE: int = 96
 const MIN_CELL_SIZE: int = 48
-const MAX_CELL_SIZE: int = 320
+const MAX_CELL_SIZE: int = 384
 const DEFAULT_COLUMNS: int = 8
 const CAMERA_PAN_SPEED: float = 200.0  # world units per second
+const MIN_CAM_ZOOM: float = 0.25
+const MAX_CAM_ZOOM: float = 8.0
 
 @onready var _back_btn: Button = %BackBtn
 @onready var _config_btn: Button = %ConfigBtn
@@ -82,7 +94,7 @@ var _disposing: bool = false
 # SubViewportContainer (holding the re-parented SubViewport) + a Label.
 var _cells: Array[Dictionary] = []
 # { "svc": SubViewportContainer, "label": Label, "viewport": SubViewport,
-#   "env": Node, "camera": Camera2D }
+#   "env": Node, "camera": Camera2D, "base_cam_zoom": Vector2 }
 
 # Per-env live stats (updated each physics frame by reading the env).
 # Mirrors godot_rl's RLEnvStats: episode count, episode reward, best reward.
@@ -90,13 +102,20 @@ var _env_stats: Array[Dictionary] = []
 # { "episode": int, "episode_reward": float, "best_reward": float,
 #   "last_fitness": float, "done_last_frame": bool }
 
-# Current cell size (pixels). Controlled by zoom buttons.
+# Current cell size (pixels). Scales with camera zoom.
 var _cell_size: int = DEFAULT_CELL_SIZE
+# Current camera zoom multiplier (applied to all cameras). >1 = zoomed in
+# (see less of the world, objects appear larger).
+var _cam_zoom: float = 1.0
 
 # Camera pan offset (world units). Applied to all cameras simultaneously.
 var _cam_offset: Vector2 = Vector2.ZERO
 # Track held WASD keys for continuous smooth panning.
 var _pan_input: Vector2 = Vector2.ZERO
+
+# Saved engine settings to restore on exit.
+var _saved_physics_ticks: int = 60
+var _saved_max_physics_steps: int = 8
 
 func _ready() -> void:
         _back_btn.pressed.connect(func(): back_requested.emit())
@@ -105,10 +124,13 @@ func _ready() -> void:
         _speed_down_btn.pressed.connect(_on_speed_down)
         _speed_up_btn.pressed.connect(_on_speed_up)
         _columns_spin.value_changed.connect(_on_columns_changed)
-        _zoom_in_btn.pressed.connect(func(): _adjust_cell_size(1.25))
-        _zoom_out_btn.pressed.connect(func(): _adjust_cell_size(1.0 / 1.25))
+        _zoom_in_btn.pressed.connect(func(): _adjust_zoom(1.25))
+        _zoom_out_btn.pressed.connect(func(): _adjust_zoom(1.0 / 1.25))
         # Initialize speed from the OptionButton's default selection.
         _speed = SPEED_PRESETS[_speed_option.selected]
+        # Save engine settings so we can restore them on exit.
+        _saved_physics_ticks = Engine.physics_ticks_per_second
+        _saved_max_physics_steps = Engine.max_physics_steps_per_frame
         _apply_speed()
         # Build the right-tab children.
         _visualizer = GraphVisualizerScene.instantiate()
@@ -188,6 +210,9 @@ func _build_grid() -> void:
         for i in range(n):
                 var cell := Control.new()
                 cell.custom_minimum_size = Vector2(_cell_size, _cell_size)
+                # Prevent the cell from expanding beyond its minimum size — this
+                # keeps the grid from pushing the layout wider than the viewport.
+                cell.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
                 _grid.add_child(cell)
                 var svc := SubViewportContainer.new()
                 svc.stretch = true
@@ -206,24 +231,30 @@ func _build_grid() -> void:
                 var vp: SubViewport = _evaluator.get_slot_viewport(i)
                 var env: Node = _evaluator.get_slot_env(i)
                 var cam: Camera2D = null
+                var base_zoom: Vector2 = Vector2.ONE
                 if vp:
                         vp.reparent(svc)
                         # Find + activate the camera after re-parenting.
                         if env:
                                 for child in env.find_children("*", "Camera2D", true, false):
                                         cam = child as Camera2D
+                                        base_zoom = cam.zoom
                                         cam.make_current()
                                         break
                 _cells.append({
                         "svc": svc, "label": lbl, "viewport": vp,
-                        "env": env, "camera": cam,
+                        "env": env, "camera": cam, "base_cam_zoom": base_zoom,
                 })
         # Apply current column count from the SpinBox.
         _grid.columns = int(_columns_spin.value)
+        # Apply current camera zoom.
+        _apply_camera_zoom()
 
 func _exit_tree() -> void:
         _disposing = true
-        # Restore normal time scale so we don't leave the engine accelerated.
+        # Restore saved engine settings so we don't leave the engine accelerated.
+        Engine.physics_ticks_per_second = _saved_physics_ticks
+        Engine.max_physics_steps_per_frame = _saved_max_physics_steps
         Engine.time_scale = 1.0
         _dispose_evaluator()
 
@@ -283,11 +314,22 @@ func _on_speed_index_changed(idx: int) -> void:
         _apply_speed()
 
 func _apply_speed() -> void:
-        # Use Engine.time_scale to accelerate the entire engine (physics + process).
-        # This is the same mechanism godot_rl's Academy uses (academy.gd sets
-        # Engine.time_scale = time_scale in _ready). speed=0 = pause (time_scale=0,
-        # physics frozen); speed=N = N times faster.
-        Engine.time_scale = _speed
+        # Use Engine.physics_ticks_per_second to accelerate physics. This
+        # increases the actual number of physics steps per wall-clock second,
+        # each with a proportionally smaller delta — physics quality is
+        # preserved (smaller delta = more stable integration).
+        # Engine.time_scale is NOT used because in headless mode it only
+        # inflates the delta without increasing step count, which degrades
+        # physics.
+        if _speed > 0.0:
+                Engine.physics_ticks_per_second = ceili(60.0 * _speed)
+                # Increase max_physics_steps_per_frame so the engine can actually
+                # run that many ticks per render frame. Default cap is 8.
+                Engine.max_physics_steps_per_frame = ceili(_speed * 2.0) + 8
+        else:
+                # Pause: set ticks to 0 so no physics steps run.
+                Engine.physics_ticks_per_second = 0
+                Engine.max_physics_steps_per_frame = _saved_max_physics_steps
 
 func _on_speed_down() -> void:
         var idx: int = _speed_option.selected
@@ -305,25 +347,38 @@ func _on_columns_changed(value: float) -> void:
         if is_instance_valid(_grid):
                 _grid.columns = maxi(1, int(value))
 
-# --- Cell size (camera zoom) control ---
+# --- Camera zoom control ---
 
-func _adjust_cell_size(factor: float) -> void:
-        _cell_size = clampi(int(_cell_size * factor), MIN_CELL_SIZE, MAX_CELL_SIZE)
-        # Update all cell minimum sizes. The SubViewportContainer has stretch=true,
-        # so it automatically resizes the SubViewport to match the cell size —
-        # we don't need to set vp.size manually (and Godot warns if we try).
+## Adjust camera zoom by [param factor] (1.25 = zoom in, 0.8 = zoom out).
+## Changes Camera2D.zoom (how much of the world the camera sees) and scales
+## cell size proportionally.
+func _adjust_zoom(factor: float) -> void:
+        _cam_zoom = clampf(_cam_zoom * factor, MIN_CAM_ZOOM, MAX_CAM_ZOOM)
+        # Scale cell size proportionally so the rendered content fills the cell.
+        _cell_size = clampi(int(DEFAULT_CELL_SIZE * _cam_zoom), MIN_CELL_SIZE, MAX_CELL_SIZE)
+        # Update all cell minimum sizes.
         for cell in _cells:
                 var svc: SubViewportContainer = cell.svc
                 if is_instance_valid(svc):
                         var cell_node: Control = svc.get_parent() as Control
                         if cell_node != null:
                                 cell_node.custom_minimum_size = Vector2(_cell_size, _cell_size)
+        # Apply camera zoom to all cameras.
+        _apply_camera_zoom()
+
+## Apply the current _cam_zoom to all cameras. Each camera's zoom = its
+## base zoom (from the scene) * _cam_zoom.
+func _apply_camera_zoom() -> void:
+        for cell in _cells:
+                var cam: Camera2D = cell.camera
+                var base_zoom: Vector2 = cell.base_cam_zoom
+                if cam != null and is_instance_valid(cam):
+                        cam.zoom = base_zoom * _cam_zoom
 
 # --- Camera pan (WASD) ---
 
 func _apply_camera_offset() -> void:
-        # Apply the pan offset to all cameras. Each camera's position = its original
-        # scene-defined position + _cam_offset. We use offset rather than position
+        # Apply the pan offset to all cameras. We use offset rather than position
         # so we don't fight with the scene's authored camera position.
         for cell in _cells:
                 var cam: Camera2D = cell.camera
@@ -362,8 +417,9 @@ func _process(delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
         # Continuous camera pan based on currently-held WASD keys.
+        # Scale pan speed by 1/zoom so panning feels the same at any zoom level.
         if _pan_input != Vector2.ZERO:
-                _cam_offset += _pan_input * CAMERA_PAN_SPEED * delta
+                _cam_offset += _pan_input * CAMERA_PAN_SPEED * delta / _cam_zoom
                 _apply_camera_offset()
         _update_ui()
         # Update per-env stats each frame (read from the live envs).
@@ -377,11 +433,7 @@ func _process(delta: float) -> void:
         _step_budget()
 
 ## Update per-env live stats by reading each env's current fitness + done
-## state. Mirrors godot_rl's RLEnvStats tracking:
-##   - episode_reward = current cumulative fitness this episode
-##   - episode = number of completed episodes (incremented when is_done
-##     transitions from false to true)
-##   - best_reward = max episode_reward across all episodes
+## state. Mirrors godot_rl's RLEnvStats tracking.
 func _update_env_stats() -> void:
         for i in range(_cells.size()):
                 if i >= _env_stats.size():
@@ -403,8 +455,7 @@ func _update_env_stats() -> void:
 
 ## Run training continuously. For physics envs (all current envs), run 1
 ## generation per call. _process re-launches this coroutine each frame as
-## long as speed > 0. Engine.time_scale makes physics run faster, so higher
-## speed = more physics steps per wall-clock second = faster training.
+## long as speed > 0. Engine.time_scale makes physics run faster.
 func _step_budget() -> void:
         await _step_generation()
         _stepping = false
