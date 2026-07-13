@@ -159,5 +159,5 @@ func _test_standard_threshold_changes() -> void:
         _assert(absf(final_threshold - initial_threshold) > 0.01, "Threshold should change: initial=%.3f final=%.3f" % [initial_threshold, final_threshold])
         print("  Standard threshold changes: OK")
 
-func _make_xor_env() -> XorEnvironment:
-        return XorEnvironment.new([0, 1], 2, 3)
+func _make_xor_env() -> MockTestEnv:
+        return MockTestEnv.new([0, 1], 2, 3)

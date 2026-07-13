@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://btestacrobot001"]
-
-[ext_resource type="Script" uid="uid://derjephlgvkd0" path="res://tests/test_acrobot_scene.gd" id="1_tac"]
-
-[node name="TestAcrobotScene" type="Node"]
-script = ExtResource("1_tac")

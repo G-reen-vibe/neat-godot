@@ -372,26 +372,27 @@ func _get_config_schema() -> Array:
         match _env_idx:
                 0:
                         schema.append_array([
-                                {"section": "XOR"},
-                                {"key": "_solved_threshold", "label": "Solved Fitness Threshold", "type": "float", "min": 14.0, "max": 16.0, "step": 0.1},
-                        ])
-                1:
-                        schema.append_array([
                                 {"section": "CartPole"},
                                 {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 100, "max": 1000, "step": 50},
                                 {"key": "_episodes", "label": "Episodes per Genome", "type": "int", "min": 1, "max": 10, "step": 1},
                         ])
+                1:
+                        schema.append_array([
+                                {"section": "Pong"},
+                                {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 100, "max": 2000, "step": 50},
+                                {"key": "_episodes", "label": "Episodes per Genome", "type": "int", "min": 1, "max": 10, "step": 1},
+                        ])
                 2:
                         schema.append_array([
-                                {"section": "Acrobot"},
+                                {"section": "LunarLander"},
                                 {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 100, "max": 1000, "step": 50},
-                                {"key": "_episodes", "label": "Episodes per Genome", "type": "int", "min": 1, "max": 5, "step": 1},
+                                {"key": "_episodes", "label": "Episodes per Genome", "type": "int", "min": 1, "max": 10, "step": 1},
                         ])
                 3:
                         schema.append_array([
-                                {"section": "Pong Tournament"},
-                                {"key": "_points_to_win", "label": "Points to Win (per match)", "type": "int", "min": 1, "max": 11, "step": 1},
-                                {"key": "_episodes", "label": "Tournament Opponents (max 3)", "type": "int", "min": 0, "max": 3, "step": 1},
+                                {"section": "BipedalWalker"},
+                                {"key": "_max_steps", "label": "Max Steps per Episode", "type": "int", "min": 100, "max": 1000, "step": 50},
+                                {"key": "_episodes", "label": "Episodes per Genome", "type": "int", "min": 1, "max": 5, "step": 1},
                         ])
         return schema
 
@@ -482,36 +483,40 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.novelty_weight = 1.0
         match env_idx:
                 0:
-                        c.num_inputs = 2
-                        c.num_outputs = 1
-                        c.output_activation = ActivationFunctions.Func.SIGMOID
-                        c.population_size = 150
-                1:
+                        # CartPole: 4 inputs (x, vx, theta, theta_dot), 1 output (force)
                         c.num_inputs = 4
                         c.num_outputs = 1
                         c.population_size = 100
-                2:
-                        c.num_inputs = 6
-                        c.num_outputs = 1
-                        c.population_size = 100
-                3:
-                        c.num_inputs = 6
+                1:
+                        # Pong: 5 inputs (ball x/y/vx/vy, paddle y), 1 output (paddle vel)
+                        c.num_inputs = 5
                         c.num_outputs = 1
                         c.population_size = 80
+                2:
+                        # LunarLander: 6 inputs (x, y, vx, vy, angle, ang_vel), 3 outputs (thrusts)
+                        c.num_inputs = 6
+                        c.num_outputs = 3
+                        c.population_size = 100
+                3:
+                        # BipedalWalker: 8 inputs (4 joint angles, torso angle, vx, vy, contact), 4 outputs (torques)
+                        c.num_inputs = 8
+                        c.num_outputs = 4
+                        c.population_size = 100
         return c
 
 func _make_extra(env_idx: int) -> Dictionary:
         var d: Dictionary = {"_max_generations": 999999}
         match env_idx:
-                0: d["_solved_threshold"] = 15.5
-                1:
+                0:  # CartPole
                         d["_max_steps"] = 500
                         d["_episodes"] = 3
-                2:
+                1:  # Pong
+                        d["_max_steps"] = 1000
+                        d["_episodes"] = 3
+                2:  # LunarLander
+                        d["_max_steps"] = 500
+                        d["_episodes"] = 3
+                3:  # BipedalWalker
                         d["_max_steps"] = 500
                         d["_episodes"] = 2
-                3:
-                        d["_max_steps"] = 1200
-                        d["_points_to_win"] = 5
-                        d["_episodes"] = 3
         return d

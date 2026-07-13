@@ -6,7 +6,7 @@
 ##       VBox
 ##         Header (toolbar: back, config, speed down/dropdown/up, status)
 ##         VizToolbar (zoom in/out, reset view)
-##         VizContainer (env viewport or XOR truth table)
+##         VizContainer (env viewport)
 ##         HelpBar (key hints)
 ##     Right (fixed 420px):
 ##       TabContainer (Genome / Stats / Saving)
@@ -14,10 +14,9 @@
 ## Training control: speed dropdown with speed=0 (Pause) .. 50x.
 ##   - speed=0 (Pause): training halted; live env runs (driven by its own
 ##     _physics_process in live_mode).
-##   - speed=N: training runs continuously. For XOR (synchronous), N generations
-##     per render frame. For physics envs, training runs as fast as physics
-##     allows (1 generation per evaluate_all coroutine completion); the speed
-##     value is ignored for physics envs but kept for UI consistency.
+##   - speed=N: training runs continuously. For physics envs, training runs as
+##     fast as physics allows (1 generation per evaluate_all coroutine
+##     completion); the speed value is ignored but kept for UI consistency.
 ##
 ## Live env architecture (NEW):
 ##   - The live env drives ITSELF via its own _physics_process when live_mode
@@ -42,10 +41,9 @@ const GraphVisualizerScene: PackedScene = preload("res://ui/components/graph_vis
 const TrainingStatsViewScene: PackedScene = preload("res://ui/components/training_stats_view.tscn")
 const SaveLoadViewScene: PackedScene = preload("res://ui/components/save_load_view.tscn")
 const EnvViewportScene: PackedScene = preload("res://ui/components/env_viewport.tscn")
-const XorTruthTableScene: PackedScene = preload("res://ui/components/xor_truth_table.tscn")
 
-# Speed presets: index in OptionButton -> generations per frame (for XOR).
-# For physics envs, any speed > 0 means "train continuously".
+# Speed presets: index in OptionButton -> generations per frame.
+# For physics envs (all current envs), any speed > 0 means "train continuously".
 # Index 0 is Pause (speed=0); indices 1..6 are 1x..50x.
 const SPEED_PRESETS: Array[int] = [0, 1, 2, 5, 10, 25, 50]
 
@@ -67,7 +65,6 @@ var _visualizer: GraphVisualizer
 var _stats_view: TrainingStatsView
 var _save_load_view: SaveLoadView
 var _env_viewport: EnvViewport
-var _xor_table: XorTruthTable
 
 var _pop: Population = null
 var _config: NeatConfig = null
@@ -86,7 +83,7 @@ var _live_env: Node = null
 var _disposing: bool = false
 
 # Live genome: the genome currently shown in the visualization (env replay
-# or XOR truth table). Defaults to the population's best genome. N cycles
+# or env viewport). Defaults to the population's best genome. N cycles
 # forward through pop.genomes; B resets to best.
 var _live_is_best: bool = true
 var _live_idx: int = -1  # index into pop.genomes; -1 means "best"
@@ -124,19 +121,19 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _save_load_view.population = pop
         _save_load_view.config = config
         _save_load_view.env_idx = env_idx
-        # Determine env scene + view type.
+        # Determine env scene + view type. All current envs are physics-based 2D.
         match env_idx:
                 0:
-                        _env_scene = null
-                        _view_type = "xor"
+                        _env_scene = load("res://environments/cartpole/neat_cartpole_env.tscn")
+                        _view_type = "2d"
                 1:
-                        _env_scene = load("res://environments/cartpole/cartpole_environment.tscn")
+                        _env_scene = load("res://environments/pong/neat_pong_env.tscn")
                         _view_type = "2d"
                 2:
-                        _env_scene = load("res://environments/acrobot/acrobot_environment.tscn")
+                        _env_scene = load("res://environments/lunar_lander/neat_lunar_lander_env.tscn")
                         _view_type = "2d"
                 3:
-                        _env_scene = load("res://environments/pong/pong_environment.tscn")
+                        _env_scene = load("res://environments/bipedal_walker/neat_bipedal_walker_env.tscn")
                         _view_type = "2d"
         await _setup_visualization()
         _setup_evaluator()
@@ -150,15 +147,7 @@ func _setup_visualization() -> void:
                 c.queue_free()
         # Wait a frame so queue_free takes effect before adding new children.
         await get_tree().process_frame
-        if _view_type == "xor":
-                _xor_table = XorTruthTableScene.instantiate()
-                _viz_container.add_child(_xor_table)
-                # Hide camera buttons for XOR (no spatial visualization).
-                _zoom_in_btn.visible = false
-                _zoom_out_btn.visible = false
-                _reset_view_btn.visible = false
-                _xor_table.genome = _live_genome()
-        elif _env_scene != null:
+        if _env_scene != null:
                 _env_viewport = EnvViewportScene.instantiate()
                 _viz_container.add_child(_env_viewport)
                 _env_viewport.set_env_scene(_env_scene, _view_type)
@@ -191,16 +180,12 @@ func _setup_visualization() -> void:
 func _setup_evaluator() -> void:
         # Dispose any previous evaluator (frees its SubViewports).
         _dispose_evaluator()
-        if _env_idx == 0:
-                _evaluator = Evaluator.new(Callable(self, "_make_xor_env"), 100, "topological")
-                _evaluator.episodes_per_genome = 1
-                _evaluator.num_threads = 4
-        else:
-                var max_steps: int = int(_extra.get("_max_steps", 500))
-                var pop_size: int = _config.population_size
-                _evaluator = SceneEvaluator.new(self, _env_scene, pop_size, max_steps + 10, _config.forward_mode)
-                _evaluator.episodes_per_genome = int(_extra.get("_episodes", 1))
-                _evaluator.env_setup_fn = _make_env_setup_fn()
+        # All current envs are physics-based, so use SceneEvaluator.
+        var max_steps: int = int(_extra.get("_max_steps", 500))
+        var pop_size: int = _config.population_size
+        _evaluator = SceneEvaluator.new(self, _env_scene, pop_size, max_steps + 10, _config.forward_mode)
+        _evaluator.episodes_per_genome = int(_extra.get("_episodes", 1))
+        _evaluator.env_setup_fn = _make_env_setup_fn()
 
 func _dispose_evaluator() -> void:
         if _evaluator == null:
@@ -220,41 +205,49 @@ func _exit_tree() -> void:
         # Dispose the evaluator (frees its SubViewports).
         _dispose_evaluator()
 
-func _make_xor_env() -> XorEnvironment:
-        return XorEnvironment.new([0, 1], 2, 3)
-
 func _make_env_setup_fn() -> Callable:
         var num_in: int = _config.num_inputs
         var bias_id: int = num_in
         var output_start: int = num_in + 1
         var max_steps: int = int(_extra.get("_max_steps", 500))
-        var points_to_win: int = int(_extra.get("_points_to_win", 5))
+        var output_ids: Array[int] = []
         match _env_idx:
-                1:
+                0:  # CartPole: 4 inputs, 1 output
                         var ids: Array[int] = [0, 1, 2, 3]
+                        output_ids = [output_start]
                         return func(env: Node) -> void:
                                 env.input_node_ids = ids
                                 env.bias_node_id = bias_id
                                 env.output_node_id = output_start
+                                env.output_node_ids = output_ids
                                 env.set_max_steps(max_steps)
-                2:
-                        var ids2: Array[int] = [0, 1, 2, 3, 4, 5]
+                1:  # Pong: 5 inputs, 1 output
+                        var ids2: Array[int] = [0, 1, 2, 3, 4]
+                        output_ids = [output_start]
                         return func(env: Node) -> void:
                                 env.input_node_ids = ids2
                                 env.bias_node_id = bias_id
                                 env.output_node_id = output_start
+                                env.output_node_ids = output_ids
                                 env.set_max_steps(max_steps)
-                3:
+                2:  # LunarLander: 6 inputs, 3 outputs
                         var ids3: Array[int] = [0, 1, 2, 3, 4, 5]
-                        var fwd_mode: String = _config.forward_mode
+                        output_ids = [output_start, output_start + 1, output_start + 2]
                         return func(env: Node) -> void:
                                 env.input_node_ids = ids3
                                 env.bias_node_id = bias_id
                                 env.output_node_id = output_start
-                                env.points_to_win = points_to_win
+                                env.output_node_ids = output_ids
                                 env.set_max_steps(max_steps)
-                                env.set_player_b(null)
-                                env.set_forward_mode(fwd_mode)
+                3:  # BipedalWalker: 8 inputs, 4 outputs
+                        var ids4: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7]
+                        output_ids = [output_start, output_start + 1, output_start + 2, output_start + 3]
+                        return func(env: Node) -> void:
+                                env.input_node_ids = ids4
+                                env.bias_node_id = bias_id
+                                env.output_node_id = output_start
+                                env.output_node_ids = output_ids
+                                env.set_max_steps(max_steps)
         return Callable()
 
 # --- Speed control ---
@@ -327,12 +320,10 @@ func _show_best_live_genome() -> void:
         _live_idx = -1
         _reset_live_env()
 
-## Re-bind the live genome to the env viewport / XOR table and reset the
-## simulation so the new genome's behavior is shown from the start.
+## Re-bind the live genome to the env viewport and reset the simulation so
+## the new genome's behavior is shown from the start.
 func _reset_live_env() -> void:
         var g: Genome = _live_genome()
-        if _xor_table != null and is_instance_valid(_xor_table):
-                _xor_table.genome = g
         if _env_viewport != null and is_instance_valid(_env_viewport):
                 # Update the live genome on the env.
                 if _live_env != null and is_instance_valid(_live_env):
@@ -380,25 +371,15 @@ func _process(_delta: float) -> void:
         _stepping = true
         _step_budget()
 
-## Run training continuously. For XOR (synchronous), run _speed generations
-## per render frame. For physics envs, run 1 generation per call (the speed
-## value is ignored — physics is the bottleneck). _process will re-launch
-## this coroutine each frame as long as speed > 0.
+## Run training continuously. For physics envs (all current envs), run 1
+## generation per call — physics is the bottleneck, so the speed value is
+## ignored. _process will re-launch this coroutine each frame as long as
+## speed > 0.
 func _step_budget() -> void:
-        if _env_idx == 0:
-                # XOR: synchronous, run _speed generations per frame.
-                var steps_done: int = 0
-                while steps_done < _speed and _speed > 0 and not _disposing:
-                        await _step_generation()
-                        steps_done += 1
-                # Yield one frame so the UI can update.
-                if not _disposing:
-                        await get_tree().process_frame
-        else:
-                # Physics envs: run 1 generation per call. The evaluator's
-                # physics_frame awaits provide natural yielding. _process will
-                # re-launch us next frame if speed > 0.
-                await _step_generation()
+        # All current envs are physics-based: run 1 generation per call. The
+        # evaluator's physics_frame awaits provide natural yielding. _process will
+        # re-launch us next frame if speed > 0.
+        await _step_generation()
         _stepping = false
 
 func _step_generation() -> void:
@@ -409,8 +390,6 @@ func _step_generation() -> void:
         var fitnesses: Array[float]
         if _evaluator is SceneEvaluator:
                 fitnesses = await (_evaluator as SceneEvaluator).evaluate_all(_pop.genomes)
-        elif _evaluator is Evaluator:
-                fitnesses = (_evaluator as Evaluator).evaluate_all(_pop.genomes)
         else:
                 return
         # The evaluator may have been disposed while we were awaiting (e.g. the
@@ -454,8 +433,6 @@ func _update_ui() -> void:
                 _pop.species_count(), live_str, state_str,
         ]
         _visualizer.refresh()
-        if _xor_table != null and is_instance_valid(_xor_table):
-                _xor_table.genome = _live_genome()
         if _stats_view != null:
                 # Don't call _stats_view.refresh() here — it's expensive (rebuilds
                 # species table + history labels) and TrainingStatsView._process

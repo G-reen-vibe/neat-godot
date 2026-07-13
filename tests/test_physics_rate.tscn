@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://bphrate0001"]
-
-[ext_resource type="Script" path="res://tests/test_physics_rate.gd" id="1_pr"]
-
-[node name="TestPhysicsRate" type="Node"]
-script = ExtResource("1_pr")

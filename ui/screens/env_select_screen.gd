@@ -9,13 +9,6 @@ const EnvCardScene: PackedScene = preload("res://ui/components/env_card.tscn")
 
 const ENVS: Array = [
         {
-                "name": "XOR",
-                "desc": "Classic NEAT benchmark.\nLearn the XOR truth table.",
-                "color": Color(0.3, 0.8, 0.4),
-                "has_viz": false,
-                "physics": false,
-        },
-        {
                 "name": "CartPole",
                 "desc": "Balance a pole on\na moving cart.",
                 "color": Color(0.3, 0.7, 1.0),
@@ -23,16 +16,23 @@ const ENVS: Array = [
                 "physics": true,
         },
         {
-                "name": "Acrobot",
-                "desc": "Swing up a two-link\nunderactuated pendulum.",
-                "color": Color(0.9, 0.6, 0.2),
+                "name": "Pong",
+                "desc": "Control a paddle to hit\nthe bouncing ball.",
+                "color": Color(0.9, 0.3, 0.5),
                 "has_viz": true,
                 "physics": true,
         },
         {
-                "name": "Pong",
-                "desc": "Control a paddle to hit\nthe bouncing ball.",
-                "color": Color(0.9, 0.3, 0.5),
+                "name": "LunarLander",
+                "desc": "Fire thrusters to land\nsafely on the pad.",
+                "color": Color(0.4, 0.9, 0.5),
+                "has_viz": true,
+                "physics": true,
+        },
+        {
+                "name": "BipedalWalker",
+                "desc": "Walk forward on two legs\nwithout falling.",
+                "color": Color(0.9, 0.6, 0.2),
                 "has_viz": true,
                 "physics": true,
         },

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bneatbipedal01"]
+
+[ext_resource type="Script" path="res://environments/bipedal_walker/neat_bipedal_walker_env.gd" id="1_adapter"]
+
+[node name="NeatBipedalWalkerEnv" type="Node2D"]
+script = ExtResource("1_adapter")
