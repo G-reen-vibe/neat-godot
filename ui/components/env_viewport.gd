@@ -2,10 +2,17 @@
 ## (for physics processing) and renders it via custom _draw() using the env's
 ## get_visual_state() data.
 ##
+## The env drives itself via its own _physics_process when live_mode is true
+## (set by RunScreen). This class only reads state for rendering — it does NOT
+## call step_env/apply_action on the env.
+##
 ## Camera controls (also exposed as methods for on-screen buttons):
 ##   - Pan: WASD (held = smooth continuous pan)
 ##   - Zoom: +/- keys, or adjust_zoom(factor)
 ##   - Reset: 0 key, or reset_view()
+##
+## Overlay: shows a "Training..." indicator when training is active, plus the
+## live genome label and episode counter when paused.
 extends Control
 class_name EnvViewport
 
@@ -29,6 +36,13 @@ var _steps: int = 0
 var _max_steps: int = 0
 var _done: bool = false
 
+# Overlay info set by RunScreen.
+var _overlay_training: bool = false
+var _overlay_live_label: String = ""
+var _overlay_episode: int = 0
+var _overlay_gen: int = 0
+var _overlay_best: float = 0.0
+
 func _ready() -> void:
         custom_minimum_size = Vector2(320, 240)
         clip_contents = true
@@ -49,8 +63,9 @@ func _rebuild() -> void:
                 return
         env = env_scene.instantiate()
         add_child(env)
-        # The env is a physics Node; it will run _physics_process automatically.
-        # We render it via _draw() reading get_visual_state().
+        # The env is a physics Node; it will run _physics_process automatically
+        # (when RunScreen enables it via set_physics_process). We render it via
+        # _draw() reading get_visual_state().
 
 func set_env_io(input_ids: Array[int], bias_id: int, output_id: int, output_ids: Array[int]) -> void:
         if env == null:
@@ -66,6 +81,16 @@ func reset_env(genome: Genome, rng: RandomNumberGenerator) -> void:
         if env == null or not is_instance_valid(env):
                 return
         env.reset(genome, rng)
+
+## Set overlay info for the _draw() pass. RunScreen calls this every frame
+## with the current training state, live genome label, episode counter, and
+## population gen/best (for the training overlay).
+func set_overlay_info(info: Dictionary) -> void:
+        _overlay_training = bool(info.get("training", false))
+        _overlay_live_label = String(info.get("live_label", ""))
+        _overlay_episode = int(info.get("episode", 0))
+        _overlay_gen = int(info.get("gen", 0))
+        _overlay_best = float(info.get("best", 0.0))
 
 func adjust_zoom(factor: float) -> void:
         _camera_zoom = clampf(_camera_zoom * factor, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM)
@@ -168,8 +193,30 @@ func _draw() -> void:
                 draw_string(ThemeDB.fallback_font, Vector2(8, 20), "Unknown env type: %s" % env.get_class(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.5))
         # Info overlay (top-left).
         draw_string(ThemeDB.fallback_font, Vector2(8, 20), _info_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.7, 0.7, 0.7))
+        # Genome label (top-right).
+        if _overlay_live_label != "":
+                draw_string(ThemeDB.fallback_font, Vector2(size_vec.x - 8, 20), _overlay_live_label, HORIZONTAL_ALIGNMENT_RIGHT, -1, 12, Color(0.8, 0.85, 1.0))
+        # Episode counter (top-right, below genome label).
+        if not _overlay_training and _overlay_episode > 0:
+                draw_string(ThemeDB.fallback_font, Vector2(size_vec.x - 8, 36), "Episode %d" % _overlay_episode, HORIZONTAL_ALIGNMENT_RIGHT, -1, 11, Color(0.6, 0.7, 0.8))
+        # Training overlay (center) when training is active.
+        if _overlay_training:
+                # Semi-transparent dark overlay.
+                draw_rect(Rect2(Vector2.ZERO, size_vec), Color(0, 0, 0, 0.55), true)
+                var train_text: String = "Training...\nGen %d | Best: %.2f" % [_overlay_gen, _overlay_best]
+                _draw_centered_multiline(train_text, size_vec, 16, Color(0.9, 0.9, 0.95))
         # Camera help (bottom-left).
-        draw_string(ThemeDB.fallback_font, Vector2(8, size_vec.y - 6), "WASD=pan  +/-/0=zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.4, 0.4, 0.4))
+        draw_string(ThemeDB.fallback_font, Vector2(8, size_vec.y - 6), "WASD=pan  +/-/0=zoom  |  Space=pause  N=next  B=best", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.4, 0.4, 0.4))
+
+func _draw_centered_multiline(text: String, size_vec: Vector2, font_size: int, color: Color) -> void:
+        var lines: PackedStringArray = text.split("\n")
+        var line_h: float = font_size + 4
+        var total_h: float = line_h * lines.size()
+        var start_y: float = (size_vec.y - total_h) * 0.5
+        for i in range(lines.size()):
+                var line_w: float = ThemeDB.fallback_font.get_string_size(lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+                var x: float = (size_vec.x - line_w) * 0.5
+                draw_string(ThemeDB.fallback_font, Vector2(x, start_y + (i + 1) * line_h - 4), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 func _world_to_screen(p: Vector2, center: Vector2, zoom: float) -> Vector2:
         # World +y = UP, screen +y = DOWN. Flip y.

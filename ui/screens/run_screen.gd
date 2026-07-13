@@ -9,18 +9,25 @@
 ##         VizContainer (env viewport or XOR truth table)
 ##         HelpBar (key hints)
 ##     Right (fixed 420px):
-##       TabContainer (Genome / Stats / Saving)  -- managed by another agent
+##       TabContainer (Genome / Stats / Saving)
 ##
 ## Training control: speed dropdown with speed=0 (Pause) .. 50x.
-##   - speed=0 (Pause): training halted; live env replays the selected genome.
+##   - speed=0 (Pause): training halted; live env runs (driven by its own
+##     _physics_process in live_mode).
 ##   - speed=N: training runs continuously. For XOR (synchronous), N generations
 ##     per render frame. For physics envs, training runs as fast as physics
 ##     allows (1 generation per evaluate_all coroutine completion); the speed
 ##     value is ignored for physics envs but kept for UI consistency.
 ##
-## The live env's physics bodies are FROZEN (freeze=true) during training so
-## they don't move when the SceneEvaluator steps the SceneTree's physics. When
-## paused, the bodies are unfrozen and _drive_live_env applies actions.
+## Live env architecture (NEW):
+##   - The live env drives ITSELF via its own _physics_process when live_mode
+##     is true. RunScreen does NOT call step_env/apply_action on it.
+##   - When training (speed > 0): live env's set_physics_process(false), bodies
+##     frozen, live_mode=false. The visualization shows a "Training..." overlay.
+##   - When paused (speed == 0): live env's set_physics_process(true), bodies
+##     unfrozen, live_mode=true. The env runs the live genome continuously,
+##     auto-resetting when is_done() returns true.
+##   - N/B changes the live genome and resets the env.
 ##
 ## N/B cycle the live genome shown in the visualization (not the graph).
 ## There is no "solved" state and no generation limit — training runs
@@ -84,6 +91,11 @@ var _disposing: bool = false
 var _live_is_best: bool = true
 var _live_idx: int = -1  # index into pop.genomes; -1 means "best"
 
+# Episode counter for the live env (how many times it has auto-reset since
+# the last N/B press). Displayed in the viz overlay.
+var _live_episode: int = 0
+var _prev_live_done: bool = false
+
 func _ready() -> void:
         _back_btn.pressed.connect(func(): back_requested.emit())
         _config_btn.pressed.connect(func(): config_requested.emit())
@@ -95,7 +107,7 @@ func _ready() -> void:
         _reset_view_btn.pressed.connect(_on_reset_view)
         # Initialize speed from the OptionButton's default selection.
         _speed = SPEED_PRESETS[_speed_option.selected]
-        # Build the right-tab children (managed by another agent; we only host them).
+        # Build the right-tab children.
         _visualizer = GraphVisualizerScene.instantiate()
         _genome_tab.add_child(_visualizer)
         _stats_view = TrainingStatsViewScene.instantiate()
@@ -110,6 +122,8 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _pop = pop
         _live_is_best = true
         _live_idx = -1
+        _live_episode = 0
+        _prev_live_done = false
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
         _stats_tracker.set_config_snapshot(config)
@@ -133,8 +147,9 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
                         _view_type = "2d"
         await _setup_visualization()
         _setup_evaluator()
-        # Start with live env frozen (training active by default at speed=1).
-        _set_live_env_frozen(true)
+        # Start with live env frozen + physics_process off (training active by
+        # default at speed=1).
+        _set_live_env_active(false)
         _update_ui()
 
 func _setup_visualization() -> void:
@@ -162,6 +177,11 @@ func _setup_visualization() -> void:
                 var setup_fn: Callable = _make_env_setup_fn()
                 if setup_fn.is_valid():
                         setup_fn.call(_live_env)
+                # Set the live genome + forward mode on the env.
+                if _live_env != null:
+                        _live_env.set_live_genome(_live_genome())
+                        _live_env.live_forward_mode = _config.forward_mode
+                        _live_env.set_live_mode(false)
                 # Reset the live env with a fixed seed for consistent visualization.
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
@@ -242,10 +262,10 @@ func _on_speed_index_changed(idx: int) -> void:
         if new_speed == _speed:
                 return
         _speed = new_speed
-        # Live env is active (unfrozen) only when paused (speed == 0).
-        _set_live_env_frozen(_speed != 0)
+        # Live env is active (running its own _physics_process) only when paused.
+        _set_live_env_active(_speed == 0)
         if _speed == 0:
-                # Just paused — reset live env so it starts fresh.
+                # Just paused — reset live env so it starts fresh with the live genome.
                 _reset_live_env()
 
 func _on_speed_down() -> void:
@@ -260,21 +280,20 @@ func _on_speed_up() -> void:
                 _speed_option.selected = idx + 1
                 _on_speed_index_changed(idx + 1)
 
-## Freeze/unfreeze the live env's physics bodies. When frozen, the bodies
-## won't move even when the SceneEvaluator steps the SceneTree's physics.
-## The live env's _physics_process is ALWAYS disabled — _drive_live_env is
-## the sole driver (it calls step_env() explicitly). This prevents the
-## double-driving that caused two-cart bugs and flickering.
-func _set_live_env_frozen(frozen: bool) -> void:
+## Activate/deactivate the live env for visualization.
+## When active (paused): physics_process ON, bodies unfrozen, live_mode ON.
+## When inactive (training): physics_process OFF, bodies frozen, live_mode OFF.
+func _set_live_env_active(active: bool) -> void:
         if _live_env == null or not is_instance_valid(_live_env):
                 return
+        _live_env.set_live_mode(active)
+        _live_env.set_physics_process(active)
         if _live_env.has_method("set_bodies_frozen"):
-                _live_env.set_bodies_frozen(frozen)
-        # NEVER enable the live env's _physics_process. _drive_live_env calls
-        # step_env() explicitly, so the env's own _physics_process would
-        # double-drive it (incrementing _steps twice, checking done twice,
-        # resetting while _drive_live_env also resets, etc.).
-        _live_env.set_physics_process(false)
+                _live_env.set_bodies_frozen(not active)
+        if active:
+                # Reset episode counter when transitioning to active.
+                _live_episode = 0
+                _prev_live_done = false
 
 # --- Live genome selection (N / B keys) ---
 
@@ -313,9 +332,14 @@ func _reset_live_env() -> void:
         if _xor_table != null and is_instance_valid(_xor_table):
                 _xor_table.genome = g
         if _env_viewport != null and is_instance_valid(_env_viewport):
+                # Update the live genome on the env.
+                if _live_env != null and is_instance_valid(_live_env):
+                        _live_env.set_live_genome(g)
                 var rng := RandomNumberGenerator.new()
                 rng.seed = 12345
                 _env_viewport.reset_env(g, rng)
+                _live_episode = 0
+                _prev_live_done = false
 
 # --- Input ---
 
@@ -343,7 +367,13 @@ func _input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
-        # Refresh the status label every render frame.
+        # Track episode transitions for the live env (when paused).
+        if _speed == 0 and _live_env != null and is_instance_valid(_live_env):
+                var cur_done: bool = _live_env.is_done() if _live_env.has_method("is_done") else false
+                if cur_done and not _prev_live_done:
+                        _live_episode += 1
+                _prev_live_done = cur_done
+        # Refresh the status label + viz overlay every render frame.
         _update_ui()
         # Start training only if speed > 0, not already stepping.
         if _speed == 0 or _stepping or _disposing:
@@ -376,50 +406,6 @@ func _step_budget() -> void:
                 await _step_generation()
         _stepping = false
 
-## Drive the live env every physics tick, but ONLY when paused (speed == 0).
-func _physics_process(_delta: float) -> void:
-        if not is_visible_in_tree() or _disposing:
-                return
-        if _speed != 0:
-                return
-        _drive_live_env()
-
-## Drive the live visualization env with the live genome. This is purely for
-## display; it does NOT affect fitness (which is computed by the evaluator).
-## This is the SOLE driver of the live env — the env's own _physics_process
-## is permanently disabled. We call step_env() (game logic) + apply_action()
-## (genome's action) each physics tick.
-func _drive_live_env() -> void:
-        if _env_viewport == null or not is_instance_valid(_env_viewport):
-                return
-        if _live_env == null or not is_instance_valid(_live_env):
-                return
-        if not _live_env.has_method("get_state") or not _live_env.has_method("interpret_output") or not _live_env.has_method("apply_action"):
-                return
-        var g: Genome = _live_genome()
-        if g == null:
-                return
-        # Reset live env when done.
-        if _live_env.has_method("is_done") and _live_env.is_done():
-                var rng := RandomNumberGenerator.new()
-                rng.seed = 12345
-                _env_viewport.reset_env(g, rng)
-                return
-        # Step the env's game logic (increment steps, check done, handle ball
-        # reset, etc.). This replaces the env's _physics_process which is
-        # permanently disabled for the live env.
-        if _live_env.has_method("step_env"):
-                _live_env.step_env()
-        # Check done again after stepping — if the env became done this tick,
-        # reset it next tick (the is_done check above handles it).
-        if _live_env.has_method("is_done") and _live_env.is_done():
-                return
-        # Apply live genome's action.
-        var state: Dictionary = _live_env.get_state()
-        var output: Dictionary = g.forward(state, _config.forward_mode)
-        var action: Dictionary = _live_env.interpret_output(output)
-        _live_env.apply_action(action)
-
 func _step_generation() -> void:
         if _pop == null or _disposing:
                 return
@@ -446,10 +432,12 @@ func _step_generation() -> void:
         if _stats_tracker != null:
                 _stats_tracker.record(_pop)
         _pop.evolve()
-        # Note: we do NOT reset _live_is_best / _live_idx here. N/B selections
-        # persist across generations. The live genome may be stale (new genomes
-        # after evolve), but _live_genome() handles out-of-range indices by
-        # falling back to best_genome.
+        # If the live view is showing "best", update the live genome binding so
+        # the paused replay uses the new best genome. If showing a specific index,
+        # leave it (the index persists across generations; _live_genome() handles
+        # out-of-range by falling back to best).
+        if _live_is_best and _live_env != null and is_instance_valid(_live_env):
+                _live_env.set_live_genome(_live_genome())
 
 func _update_ui() -> void:
         if _pop == null:
@@ -478,6 +466,15 @@ func _update_ui() -> void:
         if _save_load_view != null:
                 _save_load_view.population = _pop
                 _save_load_view.config = _config
+        # Update the viz overlay (training indicator / genome label / episode).
+        if _env_viewport != null and is_instance_valid(_env_viewport):
+                _env_viewport.set_overlay_info({
+                        "training": _speed != 0,
+                        "live_label": live_str,
+                        "episode": _live_episode,
+                        "gen": _pop.generation,
+                        "best": _pop.best_fitness,
+                })
 
 func _adjust_zoom(factor: float) -> void:
         if _env_viewport != null and is_instance_valid(_env_viewport):

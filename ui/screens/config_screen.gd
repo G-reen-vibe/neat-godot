@@ -511,6 +511,7 @@ func _make_extra(env_idx: int) -> Dictionary:
                         d["_max_steps"] = 500
                         d["_episodes"] = 2
                 3:
+                        d["_max_steps"] = 1200
                         d["_points_to_win"] = 5
                         d["_episodes"] = 3
         return d

@@ -39,13 +39,13 @@ var _initial_pole_pos: Vector2
 var _initial_pole_rot: float
 
 func _ready() -> void:
-	# Cache initial positions for reset.
-	_initial_cart_pos = _cart.position
-	_initial_pole_pos = _pole.position
-	_initial_pole_rot = _pole.rotation
+        # Cache initial positions for reset.
+        _initial_cart_pos = _cart.position
+        _initial_pole_pos = _pole.position
+        _initial_pole_rot = _pole.rotation
 
 func set_max_steps(p_max_steps: int) -> void:
-	_max_steps = p_max_steps
+        _max_steps = p_max_steps
 
 ## Freeze/unfreeze the cart and pole RigidBody2Ds. When frozen, the bodies
 ## won't move even when the physics server steps the world. This is used by the
@@ -57,112 +57,115 @@ func set_max_steps(p_max_steps: int) -> void:
 ## So [method reset] can be called on a frozen env and the bodies will snap to
 ## the initial pose reliably.
 func set_bodies_frozen(frozen: bool) -> void:
-	_cart.freeze = frozen
-	_pole.freeze = frozen
+        _cart.freeze = frozen
+        _pole.freeze = frozen
 
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
-	super.reset(p_genome, rng)
-	_steps = 0
-	_done = false
-	# Build target transforms. Start from the cached initial pose.
-	var cart_pos: Vector2 = _initial_cart_pos
-	var pole_pos: Vector2 = _initial_pole_pos
-	var cart_lin_vel: Vector2 = Vector2.ZERO
-	var pole_ang_vel: float = 0.0
-	# Random initial perturbation (OpenAI Gym style). When perturbing the
-	# cart position, we move the pole by the same offset so the PinJoint2D
-	# constraint stays satisfied.
-	if rng != null:
-		var cart_dx: float = rng.randf_range(-0.05, 0.05)
-		cart_pos.x += cart_dx
-		pole_pos.x += cart_dx
-		cart_lin_vel.x = rng.randf_range(-0.05, 0.05)
-		pole_ang_vel = rng.randf_range(-0.15, 0.15)
-	# Queue teleports. These take effect on the next physics step (inside
-	# _integrate_forces), so the physics server's internal state is updated
-	# authoritatively — no "snap back" to a cached transform.
-	_cart.request_teleport(Transform2D(0.0, cart_pos), cart_lin_vel, 0.0)
-	_pole.request_teleport(Transform2D(_initial_pole_rot, pole_pos), Vector2.ZERO, pole_ang_vel)
+        super.reset(p_genome, rng)
+        _steps = 0
+        _done = false
+        # Build target transforms. Start from the cached initial pose.
+        var cart_pos: Vector2 = _initial_cart_pos
+        var pole_pos: Vector2 = _initial_pole_pos
+        var cart_lin_vel: Vector2 = Vector2.ZERO
+        var pole_ang_vel: float = 0.0
+        # Random initial perturbation (OpenAI Gym style). When perturbing the
+        # cart position, we move the pole by the same offset so the PinJoint2D
+        # constraint stays satisfied.
+        if rng != null:
+                var cart_dx: float = rng.randf_range(-0.05, 0.05)
+                cart_pos.x += cart_dx
+                pole_pos.x += cart_dx
+                cart_lin_vel.x = rng.randf_range(-0.05, 0.05)
+                pole_ang_vel = rng.randf_range(-0.15, 0.15)
+        # Queue teleports. These take effect on the next physics step (inside
+        # _integrate_forces), so the physics server's internal state is updated
+        # authoritatively — no "snap back" to a cached transform.
+        _cart.request_teleport(Transform2D(0.0, cart_pos), cart_lin_vel, 0.0)
+        _pole.request_teleport(Transform2D(_initial_pole_rot, pole_pos), Vector2.ZERO, pole_ang_vel)
 
 func get_state() -> Dictionary:
-	var x: float = _cart.position.x - _initial_cart_pos.x
-	var x_dot: float = _cart.linear_velocity.x
-	var theta: float = _pole.rotation
-	var theta_dot: float = _pole.angular_velocity
-	var d: Dictionary = {}
-	d[input_node_ids[0]] = x
-	d[input_node_ids[1]] = x_dot
-	d[input_node_ids[2]] = theta
-	d[input_node_ids[3]] = theta_dot
-	return d
+        var x: float = _cart.position.x - _initial_cart_pos.x
+        var x_dot: float = _cart.linear_velocity.x
+        var theta: float = _pole.rotation
+        var theta_dot: float = _pole.angular_velocity
+        var d: Dictionary = {}
+        d[input_node_ids[0]] = x
+        d[input_node_ids[1]] = x_dot
+        d[input_node_ids[2]] = theta
+        d[input_node_ids[3]] = theta_dot
+        return d
 
 func interpret_output(output: Dictionary) -> Dictionary:
-	var v: float = float(output.get(output_node_id, 0.0))
-	return {"action": 1 if v > 0.0 else 0}
+        var v: float = float(output.get(output_node_id, 0.0))
+        return {"action": 1 if v > 0.0 else 0}
 
 func apply_action(action: Dictionary) -> void:
-	if _done:
-		return
-	var a: int = int(action.get("action", 0))
-	var force: float = FORCE_MAG if a == 1 else -FORCE_MAG
-	# Fixed dt = 1/60. The physics tick rate is always 60 Hz (no speedup).
-	# Using get_physics_process_delta_time() would return stale values when
-	# called from the SceneEvaluator's coroutine (which awaits physics frames
-	# but isn't inside _physics_process).
-	var dt: float = 1.0 / 60.0
-	_cart.apply_central_impulse(Vector2(force * dt * _cart.mass, 0.0))
+        if _done:
+                return
+        var a: int = int(action.get("action", 0))
+        var force: float = FORCE_MAG if a == 1 else -FORCE_MAG
+        # Fixed dt = 1/60. The physics tick rate is always 60 Hz (no speedup).
+        # Using get_physics_process_delta_time() would return stale values when
+        # called from the SceneEvaluator's coroutine (which awaits physics frames
+        # but isn't inside _physics_process).
+        var dt: float = 1.0 / 60.0
+        _cart.apply_central_impulse(Vector2(force * dt * _cart.mass, 0.0))
 
 func is_done() -> bool:
-	return _done
+        return _done
 
 ## Step the env's game logic (increment steps, check done conditions). This is
 ## called from _physics_process (for training envs). The live env is driven by
 ## its own _physics_process too (re-enabled when paused), so this method is the
 ## single source of truth for game logic.
 func step_env() -> void:
-	if _done:
-		return
-	_steps += 1
-	var x: float = _cart.position.x - _initial_cart_pos.x
-	var theta: float = _pole.rotation
-	if absf(x) > X_THRESHOLD or absf(theta) > THETA_THRESHOLD:
-		_done = true
-		# Freeze velocities via teleport (reliable).
-		_cart.request_teleport(Transform2D(_cart.rotation, _cart.position), Vector2.ZERO, 0.0)
-		_pole.request_teleport(Transform2D(_pole.rotation, _pole.position), Vector2.ZERO, 0.0)
-	elif _steps >= _max_steps:
-		_done = true
+        if _done:
+                return
+        _steps += 1
+        var x: float = _cart.position.x - _initial_cart_pos.x
+        var theta: float = _pole.rotation
+        if absf(x) > X_THRESHOLD or absf(theta) > THETA_THRESHOLD:
+                _done = true
+                # Freeze velocities via teleport (reliable).
+                _cart.request_teleport(Transform2D(_cart.rotation, _cart.position), Vector2.ZERO, 0.0)
+                _pole.request_teleport(Transform2D(_pole.rotation, _pole.position), Vector2.ZERO, 0.0)
+        elif _steps >= _max_steps:
+                _done = true
 
 func _physics_process(_delta: float) -> void:
-	step_env()
+        if live_mode:
+                _live_step()
+        else:
+                step_env()
 
 func current_fitness() -> float:
-	return float(_steps)
+        return float(_steps)
 
 func is_solved() -> bool:
-	return _steps >= _max_steps
+        return _steps >= _max_steps
 
 func state() -> Array[float]:
-	return [
-		_cart.position.x - _initial_cart_pos.x,
-		_cart.linear_velocity.x,
-		_pole.rotation,
-		_pole.angular_velocity,
-	]
+        return [
+                _cart.position.x - _initial_cart_pos.x,
+                _cart.linear_velocity.x,
+                _pole.rotation,
+                _pole.angular_velocity,
+        ]
 
 func get_visual_state() -> Dictionary:
-	return {
-		"x": _cart.position.x - _initial_cart_pos.x,
-		"x_dot": _cart.linear_velocity.x,
-		"theta": _pole.rotation,
-		"theta_dot": _pole.angular_velocity,
-		"steps": _steps,
-		"max_steps": _max_steps,
-		"done": _done,
-		"x_threshold": X_THRESHOLD,
-		"theta_threshold": THETA_THRESHOLD,
-		"track_half_length": X_THRESHOLD,
-		"pole_half_length": 0.5,
-		"cart_pos": _cart.position,
-		"pole_pos": _pole.position,
-	}
+        return {
+                "x": _cart.position.x - _initial_cart_pos.x,
+                "x_dot": _cart.linear_velocity.x,
+                "theta": _pole.rotation,
+                "theta_dot": _pole.angular_velocity,
+                "steps": _steps,
+                "max_steps": _max_steps,
+                "done": _done,
+                "x_threshold": X_THRESHOLD,
+                "theta_threshold": THETA_THRESHOLD,
+                "track_half_length": X_THRESHOLD,
+                "pole_half_length": 0.5,
+                "cart_pos": _cart.position,
+                "pole_pos": _pole.position,
+        }
