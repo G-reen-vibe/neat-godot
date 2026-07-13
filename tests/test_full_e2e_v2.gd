@@ -98,7 +98,6 @@ func _test_cartpole() -> void:
         pop.initialize()
         var env_scene := load("res://environments/cartpole/cartpole_environment.tscn")
         var evaluator := SceneEvaluator.new(self, env_scene, 20, 510, "topological")
-        evaluator.speedup = 2.0
         evaluator.episodes_per_genome = 1
         var input_ids: Array[int] = [0, 1, 2, 3]
         evaluator.env_setup_fn = func(env: Node) -> void:
@@ -127,7 +126,6 @@ func _test_acrobot() -> void:
         pop.initialize()
         var env_scene := load("res://environments/acrobot/acrobot_environment.tscn")
         var evaluator := SceneEvaluator.new(self, env_scene, 20, 510, "topological")
-        evaluator.speedup = 2.0
         evaluator.episodes_per_genome = 1
         var input_ids: Array[int] = [0, 1, 2, 3, 4, 5]
         evaluator.env_setup_fn = func(env: Node) -> void:
@@ -156,7 +154,6 @@ func _test_pong() -> void:
         pop.initialize()
         var env_scene := load("res://environments/pong/pong_environment.tscn")
         var evaluator := SceneEvaluator.new(self, env_scene, 15, 1210, "topological")
-        evaluator.speedup = 2.0
         evaluator.episodes_per_genome = 1
         var input_ids: Array[int] = [0, 1, 2, 3, 4, 5]
         evaluator.env_setup_fn = func(env: Node) -> void:

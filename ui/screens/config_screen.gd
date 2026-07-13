@@ -367,10 +367,6 @@ func _get_config_schema() -> Array:
                 ]},
                 {"key": "novelty_weight", "label": "Novelty Weight (bonus multiplier)", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1,
                  "visible_when": {"evaluation_method": "novelty"}},
-
-                # --- Speed ---
-                {"section": "Simulation Speed"},
-                {"key": "_speedup", "label": "Physics Speedup Factor", "type": "float", "min": 1.0, "max": 8.0, "step": 0.5},
         ]
         # Per-env options.
         match _env_idx:
@@ -505,7 +501,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         return c
 
 func _make_extra(env_idx: int) -> Dictionary:
-        var d: Dictionary = {"_max_generations": 200, "_speedup": 2.0}
+        var d: Dictionary = {"_max_generations": 200}
         match env_idx:
                 0: d["_solved_threshold"] = 15.5
                 1:

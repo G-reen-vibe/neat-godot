@@ -1,21 +1,23 @@
 extends Node
-## End-to-end test for the left-panel overhaul. Simulates a user playing
-## the game: selects an env, starts training, changes speed, cycles live
-## genomes with N/B, pans/zooms the camera with WASD/+/-/0, and goes back.
+## End-to-end test for the left-panel overhaul with pause/resume control.
+## Simulates a user playing the game: selects an env, starts training, pauses,
+## cycles live genomes with N/B, pans/zooms the camera with WASD/+/-/0, and
+## goes back.
 ##
 ## Verifies:
-##   1. No Run/Pause button, no Restart button, no Follow button exist.
-##   2. Speed dropdown has "Pause" as item 0 and 1x as default (selected=1).
-##   3. Speed down/up buttons change the dropdown selection within bounds.
-##   4. Speed=Pause (index 0) halts training (generation doesn't advance).
+##   1. No Run/Pause dropdown, no Restart button, no Follow button exist.
+##   2. PauseResumeBtn exists and toggles _paused correctly.
+##   3. Pause halts training (generation doesn't advance).
+##   4. Resume restarts training (generation advances).
 ##   5. N key cycles the live genome (live_idx advances through pop.genomes).
 ##   6. B key resets to best genome (live_is_best = true).
 ##   7. WASD keys set _pan_input in EnvViewport (continuous pan).
 ##   8. +/-/0 keys adjust zoom and reset view in EnvViewport.
 ##   9. ESC key does NOT exit the run screen (binding was removed).
 ##  10. Camera help text in EnvViewport mentions "WASD".
-##  11. Status label is non-empty and contains "Gen" and "Speed" or "Paused".
+##  11. Status label is non-empty and contains "Gen" and "Paused"/"Training".
 ##  12. N/B do NOT change the graph visualizer's current genome index.
+##  13. Live env is only driven when paused (not during training).
 ##
 ## Run with: godot --headless --path . res://tests/test_left_panel_overhaul.tscn
 
@@ -55,7 +57,6 @@ func _ready() -> void:
         extra["_max_generations"] = 50
         extra["_max_steps"] = 100
         extra["_episodes"] = 1
-        extra["_speedup"] = 2.0
         config_screen.start_requested.emit(cfg, extra)
         await get_tree().process_frame
         await get_tree().process_frame
@@ -72,90 +73,75 @@ func _ready() -> void:
                 _fail("RestartBtn should have been removed")
         if _find_node_by_name(run_screen, "FollowBtn") != null:
                 _fail("FollowBtn should have been removed")
+        if _find_node_by_name(run_screen, "SpeedOption") != null:
+                _fail("SpeedOption should have been removed")
+        if _find_node_by_name(run_screen, "SpeedDownBtn") != null:
+                _fail("SpeedDownBtn should have been removed")
+        if _find_node_by_name(run_screen, "SpeedUpBtn") != null:
+                _fail("SpeedUpBtn should have been removed")
         if not _failed:
-                print("  [OK] Removed buttons: RunPause, Restart, Follow are gone")
-        # --- Test 2: Speed dropdown structure ---
-        var speed_option := _find_node_by_name(run_screen, "SpeedOption") as OptionButton
-        if speed_option == null:
-                _fail("SpeedOption not found")
+                print("  [OK] Removed: RunPause, Restart, Follow, Speed dropdown/buttons")
+        # --- Test 2: PauseResumeBtn exists and toggles ---
+        var pause_btn: Button = _find_node_by_name(run_screen, "PauseResumeBtn")
+        if pause_btn == null:
+                _fail("PauseResumeBtn not found")
         else:
-                if speed_option.get_item_count() != 7:
-                        _fail("SpeedOption should have 7 items, got %d" % speed_option.get_item_count())
-                if speed_option.get_item_text(0) != "Pause":
-                        _fail("SpeedOption item 0 should be 'Pause', got '%s'" % speed_option.get_item_text(0))
-                if speed_option.selected != 1:
-                        _fail("SpeedOption default should be index 1 (1x), got %d" % speed_option.selected)
+                if pause_btn.text != "Pause":
+                        _fail("PauseResumeBtn initial text should be 'Pause', got '%s'" % pause_btn.text)
+                if run_screen._paused != false:
+                        _fail("Initial _paused should be false")
+                # Click pause.
+                pause_btn.button_pressed = true
+                pause_btn.toggled.emit(true)
+                await get_tree().process_frame
+                if run_screen._paused != true:
+                        _fail("After toggle, _paused should be true")
+                if pause_btn.text != "Resume":
+                        _fail("After pause, text should be 'Resume', got '%s'" % pause_btn.text)
                 if not _failed:
-                        print("  [OK] Speed dropdown: 7 items, item 0 = Pause, default = 1x")
-        # --- Test 3: Speed down/up buttons ---
-        var speed_down := _find_node_by_name(run_screen, "SpeedDownBtn") as Button
-        var speed_up := _find_node_by_name(run_screen, "SpeedUpBtn") as Button
-        if speed_down == null or speed_up == null:
-                _fail("SpeedDownBtn or SpeedUpBtn not found")
-        else:
-                # Start at index 1 (1x). Click down -> index 0 (Pause).
-                speed_down.pressed.emit()
-                await get_tree().process_frame
-                if speed_option.selected != 0:
-                        _fail("After SpeedDown, selected should be 0 (Pause), got %d" % speed_option.selected)
-                # Click down again -> should stay at 0 (clamped).
-                speed_down.pressed.emit()
-                await get_tree().process_frame
-                if speed_option.selected != 0:
-                        _fail("SpeedDown at 0 should stay 0, got %d" % speed_option.selected)
-                # Click up -> index 1.
-                speed_up.pressed.emit()
-                await get_tree().process_frame
-                if speed_option.selected != 1:
-                        _fail("After SpeedUp from 0, selected should be 1, got %d" % speed_option.selected)
-                # Click up several times -> should reach max (6) and stay.
-                for i in range(10):
-                        speed_up.pressed.emit()
-                await get_tree().process_frame
-                if speed_option.selected != 6:
-                        _fail("After many SpeedUp, selected should be 6 (max), got %d" % speed_option.selected)
-                # Click up again -> should stay at 6.
-                speed_up.pressed.emit()
-                await get_tree().process_frame
-                if speed_option.selected != 6:
-                        _fail("SpeedUp at max should stay max, got %d" % speed_option.selected)
-                if not _failed:
-                        print("  [OK] Speed down/up buttons clamp within [0, 6]")
-        # Reset to 1x for further tests.
-        speed_option.selected = 1
-        speed_option.item_selected.emit(1)
-        await get_tree().process_frame
-        # --- Test 4: Speed=Pause halts training ---
-        # Let it train a few frames at 1x. CartPole needs ~50-100 render frames
-        # per generation (SceneEvaluator awaits physics frames, speedup=2.0).
+                        print("  [OK] PauseResumeBtn toggles _paused and updates text")
+        # --- Test 3: Pause halts training ---
+        # First resume and let it train a bit.
+        pause_btn.button_pressed = false
+        pause_btn.toggled.emit(false)
         var gen_before: int = run_screen.get_population().generation
         for i in range(180):
                 await get_tree().process_frame
         var gen_after_run: int = run_screen.get_population().generation
         if gen_after_run <= gen_before:
-                _fail("Training didn't advance at 1x: before=%d after=%d" % [gen_before, gen_after_run])
+                _fail("Training didn't advance when resumed: before=%d after=%d" % [gen_before, gen_after_run])
         # Pause.
-        speed_option.selected = 0
-        speed_option.item_selected.emit(0)
-        # Wait for any in-flight generation to complete (the pause takes effect
-        # after the current step finishes).
+        pause_btn.button_pressed = true
+        pause_btn.toggled.emit(true)
+        # Wait for in-flight generation to complete.
         for i in range(120):
                 await get_tree().process_frame
         var gen_at_pause: int = run_screen.get_population().generation
-        # Now wait another 60 frames and verify no further advancement.
+        # Wait another 60 frames and verify no advancement.
         for i in range(60):
                 await get_tree().process_frame
         var gen_after_pause: int = run_screen.get_population().generation
         if gen_after_pause != gen_at_pause:
                 _fail("Training advanced while paused: at_pause=%d after_pause=%d" % [gen_at_pause, gen_after_pause])
         if not _failed:
-                print("  [OK] Speed=Pause halts training (gen stayed at %d)" % gen_at_pause)
-        # Resume at 1x.
-        speed_option.selected = 1
-        speed_option.item_selected.emit(1)
-        await get_tree().process_frame
+                print("  [OK] Pause halts training (gen stayed at %d)" % gen_at_pause)
+        # --- Test 4: Resume restarts training ---
+        var gen_before_resume: int = run_screen.get_population().generation
+        pause_btn.button_pressed = false
+        pause_btn.toggled.emit(false)
+        for i in range(120):
+                await get_tree().process_frame
+        var gen_after_resume: int = run_screen.get_population().generation
+        if gen_after_resume <= gen_before_resume:
+                _fail("Training didn't resume after unpausing: before=%d after=%d" % [gen_before_resume, gen_after_resume])
+        if not _failed:
+                print("  [OK] Resume restarts training (gen %d -> %d)" % [gen_before_resume, gen_after_resume])
         # --- Test 5 & 6: N/B keys cycle live genome ---
-        # Wait for at least 1 generation to ensure best_genome is set.
+        # Pause so we can test the live env.
+        pause_btn.button_pressed = true
+        pause_btn.toggled.emit(true)
+        await get_tree().process_frame
+        # Wait for best_genome to be set.
         for i in range(60):
                 await get_tree().process_frame
                 if run_screen.get_population().best_genome != null:
@@ -165,8 +151,6 @@ func _ready() -> void:
                 _fail("Population/best_genome not ready for N/B test")
         else:
                 # Press N -> live genome should be pop.genomes[0].
-                # We call _next_live_genome() directly because Input.parse_input_event
-                # is unreliable for key injection in headless mode.
                 run_screen._next_live_genome()
                 await get_tree().process_frame
                 if run_screen._live_is_best:
@@ -191,28 +175,22 @@ func _ready() -> void:
         if env_viewport == null:
                 _fail("EnvViewport not found")
         else:
-                # Press W (pan up). We call _input directly because
-                # Input.parse_input_event is unreliable in headless mode.
                 env_viewport._input(_make_key(KEY_W, true))
                 await get_tree().process_frame
                 if env_viewport._pan_input.y != -1.0:
                         _fail("After W, _pan_input.y should be -1.0, got %f" % env_viewport._pan_input.y)
-                # Release W.
                 env_viewport._input(_make_key(KEY_W, false))
                 await get_tree().process_frame
                 if env_viewport._pan_input.y != 0.0:
                         _fail("After W release, _pan_input.y should be 0.0, got %f" % env_viewport._pan_input.y)
-                # Press A.
                 env_viewport._input(_make_key(KEY_A, true))
                 await get_tree().process_frame
                 if env_viewport._pan_input.x != -1.0:
                         _fail("After A, _pan_input.x should be -1.0, got %f" % env_viewport._pan_input.x)
-                # Press D simultaneously (overrides A).
                 env_viewport._input(_make_key(KEY_D, true))
                 await get_tree().process_frame
                 if env_viewport._pan_input.x != 1.0:
                         _fail("After D (while A held), _pan_input.x should be 1.0, got %f" % env_viewport._pan_input.x)
-                # Release all.
                 env_viewport._input(_make_key(KEY_A, false))
                 env_viewport._input(_make_key(KEY_D, false))
                 await get_tree().process_frame
@@ -249,9 +227,7 @@ func _ready() -> void:
                 _fail("ESC exited the run screen (binding should be removed)")
         elif not _failed:
                 print("  [OK] ESC does not exit the run screen")
-        # --- Test 10: Camera help text mentions WASD ---
-        # (Verified via the EnvViewport._draw string; we can't easily read it
-        # back, so we just check that the help text in the tscn is correct.)
+        # --- Test 10: Help text mentions WASD ---
         var help_label := _find_node_by_name(run_screen, "HelpText") as Label
         if help_label == null:
                 _fail("HelpText label not found")
@@ -270,9 +246,6 @@ func _ready() -> void:
         elif not _failed:
                 print("  [OK] Status label: %s" % status_label.text)
         # --- Test 12: N/B did NOT change the graph visualizer ---
-        # The graph visualizer has its own _current_genome_idx that starts at 0.
-        # After our N/B presses above, it should still be at 0 (or whatever it
-        # was set to by its own navigation, not by our N/B).
         var viz := _find_node_by_name(run_screen, "GraphVisualizer") as GraphVisualizer
         if viz == null:
                 _fail("GraphVisualizer not found")
@@ -280,6 +253,22 @@ func _ready() -> void:
                 _fail("GraphVisualizer._current_genome_idx should be 0 (N/B shouldn't affect it), got %d" % viz._current_genome_idx)
         elif not _failed:
                 print("  [OK] N/B did not change the graph visualizer's genome index")
+        # --- Test 13: Live env driven only when paused ---
+        # We're currently paused, so _physics_process should drive the live env.
+        # Verify by checking that the live env's step counter advances while paused.
+        if env_viewport != null and env_viewport.env != null:
+                var steps_before: int = env_viewport.env._steps if env_viewport.env.has_method("get") and "_steps" in env_viewport.env else 0
+                # Use get_visual_state to read steps.
+                var vis_state: Dictionary = env_viewport.env.get_visual_state()
+                steps_before = int(vis_state.get("steps", 0))
+                for i in range(30):
+                        await get_tree().physics_frame
+                vis_state = env_viewport.env.get_visual_state()
+                var steps_after: int = int(vis_state.get("steps", 0))
+                if steps_after <= steps_before:
+                        _fail("Live env didn't advance while paused: before=%d after=%d" % [steps_before, steps_after])
+                elif not _failed:
+                        print("  [OK] Live env advances while paused (steps %d -> %d)" % [steps_before, steps_after])
         # --- Done ---
         if _failed:
                 _halt()

@@ -16,7 +16,8 @@ extends Node
 
 const MainAppScene: PackedScene = preload("res://ui/main_app.tscn")
 const ENVS_TO_TEST: Array[int] = [0, 1, 2, 3]  # XOR, CartPole, Acrobot, Pong
-const TRAINING_FRAMES_PER_ENV: int = 600  # ~10 seconds at 60fps
+const TRAINING_FRAMES_XOR: int = 120  # XOR is synchronous, very fast
+const TRAINING_FRAMES_PHYSICS: int = 400  # Physics envs need ~200 physics frames per gen (no speedup)
 
 var _app: Control
 var _failed: bool = false
@@ -121,7 +122,8 @@ func _test_env(env_idx: int) -> void:
         print("    run screen OK")
         # 5. Training auto-runs at default speed (1x). Let it train for a few seconds.
         var last_gen: int = -1
-        for i in range(TRAINING_FRAMES_PER_ENV):
+        var training_frames: int = TRAINING_FRAMES_XOR if env_idx == 0 else TRAINING_FRAMES_PHYSICS
+        for i in range(training_frames):
                 await get_tree().process_frame
                 if _failed:
                         return
@@ -162,26 +164,17 @@ func _test_env(env_idx: int) -> void:
                 if reset_view: reset_view.pressed.emit()
                 await get_tree().process_frame
                 print("    viz buttons OK")
-        # 9. Test speed dropdown: pause then resume.
-        var speed_option: OptionButton = _find_node_by_name(run_screen, "SpeedOption")
-        if speed_option != null:
-                speed_option.selected = 0  # Pause
-                speed_option.item_selected.emit(0)
+        # 9. Test pause/resume button.
+        var pause_btn: Button = _find_node_by_name(run_screen, "PauseResumeBtn")
+        if pause_btn != null:
+                pause_btn.button_pressed = true
+                pause_btn.toggled.emit(true)
                 await get_tree().process_frame
-                speed_option.selected = 1  # 1x
-                speed_option.item_selected.emit(1)
+                pause_btn.button_pressed = false
+                pause_btn.toggled.emit(false)
                 await get_tree().process_frame
-                print("    speed control OK")
-        # 10. Test speed up/down buttons.
-        var speed_down: Button = _find_node_by_name(run_screen, "SpeedDownBtn")
-        var speed_up: Button = _find_node_by_name(run_screen, "SpeedUpBtn")
-        if speed_down and speed_up:
-                speed_down.pressed.emit()
-                await get_tree().process_frame
-                speed_up.pressed.emit()
-                await get_tree().process_frame
-                print("    speed buttons OK")
-        # 11. Back to menu.
+                print("    pause/resume OK")
+        # 10. Back to menu.
         var back_btn: Button = _find_node_by_name(run_screen, "BackBtn")
         if back_btn == null:
                 _fail("BackBtn not found")

@@ -10,9 +10,11 @@
 ## evaluator is a coroutine: [method evaluate_all] returns a coroutine that
 ## the caller must [code]await[/code].
 ##
-## Speedup is achieved by temporarily raising [member Engine.time_scale] and
-## [member Engine.physics_ticks_per_second] for the duration of evaluation.
-## These are restored to their original values when evaluation completes.
+## Note: This evaluator does NOT modify Engine.time_scale or
+## Engine.physics_ticks_per_second. Previously it raised those for "speedup",
+## but those settings are global to the SceneTree and would also affect the
+## live visualization env (causing it to flicker / teleport). Speedup is no
+## longer used; training runs at the normal 60 Hz physics tick rate.
 class_name SceneEvaluator
 extends RefCounted
 
@@ -31,23 +33,9 @@ var max_steps: int = 500
 ## Forward pass mode: "topological" or "timestep".
 var forward_mode: String = "topological"
 
-## Speedup factor for evaluation. [member Engine.time_scale] and
-## [member Engine.physics_ticks_per_second] are multiplied by this during
-## evaluation. Higher values run faster but may cause physics instability
-## in joint-heavy envs. Recommended range: 1.0–4.0.
-var speedup: float = 2.0
-
-## Base physics tick rate (per second). The effective rate during evaluation
-## is [member base_physics_ticks] × [member speedup].
-var base_physics_ticks: int = 60
-
 ## Number of episodes to run per genome (averaged). Each episode uses a
 ## different RNG seed derived from the genome index.
 var episodes_per_genome: int = 1
-
-## Whether envs should render their SubViewport during training. Disable for
-## maximum speed; enable if you want to peek at training via the inspector.
-var render_during_training: bool = false
 
 ## Optional: called once per env instance after instantiation to configure
 ## env-specific constants (input/output node IDs, max_steps, etc.).
@@ -55,10 +43,8 @@ var render_during_training: bool = false
 var env_setup_fn: Callable = Callable()
 
 # Internal: pool of (SubViewport, env) pairs.
-var _slots: Array = []  # Array[Dictionary] { viewport: SubViewport, env: Node, busy: bool }
+var _slots: Array = []  # Array[Dictionary] { viewport: SubViewport, env: Node, configured: bool }
 var _host: Node = null
-var _original_time_scale: float = 1.0
-var _original_physics_ticks: int = 60
 
 func _init(p_host: Node, p_env_scene: PackedScene, p_num_slots: int = 100, p_max_steps: int = 500, p_forward_mode: String = "topological") -> void:
         _host = p_host
@@ -87,7 +73,7 @@ func _setup_slots() -> void:
                 sv.render_target_update_mode = SubViewport.UPDATE_DISABLED
                 sv.add_child(env)
                 _host.add_child(sv)
-                _slots.append({ "viewport": sv, "env": env, "busy": false, "configured": false })
+                _slots.append({ "viewport": sv, "env": env, "configured": false })
 
 ## Evaluate all genomes. Returns an Array[float] of fitnesses parallel to
 ## [param genomes]. MUST be awaited (this is a coroutine).
@@ -95,8 +81,6 @@ func evaluate_all(genomes: Array) -> Array[float]:
         var out: Array[float] = []
         out.resize(genomes.size())
         out.fill(0.0)
-        # Apply speedup once for the whole evaluation.
-        _begin_speedup()
         # Run in batches of num_slots.
         var idx: int = 0
         while idx < genomes.size():
@@ -105,8 +89,6 @@ func evaluate_all(genomes: Array) -> Array[float]:
                 for i in range(batch_size):
                         out[idx + i] = batch_fitnesses[i]
                 idx += batch_size
-        # Restore engine settings.
-        _end_speedup()
         return out
 
 ## Evaluate [param batch_size] genomes starting at [param start_idx] in parallel.
@@ -162,16 +144,6 @@ func _evaluate_batch(genomes: Array, start_idx: int, batch_size: int) -> Array[f
         for i in range(batch_size):
                 out[i] /= float(num_episodes)
         return out
-
-func _begin_speedup() -> void:
-        _original_time_scale = Engine.time_scale
-        _original_physics_ticks = Engine.physics_ticks_per_second
-        Engine.time_scale = speedup
-        Engine.physics_ticks_per_second = int(float(base_physics_ticks) * speedup)
-
-func _end_speedup() -> void:
-        Engine.time_scale = _original_time_scale
-        Engine.physics_ticks_per_second = _original_physics_ticks
 
 ## Free all pooled slots. Call when the evaluator is no longer needed.
 func dispose() -> void:
