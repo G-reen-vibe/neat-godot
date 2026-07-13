@@ -9,7 +9,7 @@
 ##         VizContainer (env viewport or XOR truth table)
 ##         HelpBar (key hints)
 ##     Right (fixed 420px):
-##       TabContainer (Genome / Stats / Save-Load)  -- managed by another agent
+##       TabContainer (Genome / Stats / Saving)  -- managed by another agent
 ##
 ## Training is controlled purely by the Speed dropdown:
 ##   - "Pause" (speed=0) halts training; the live env keeps replaying.
@@ -32,7 +32,6 @@ const XorTruthTableScene: PackedScene = preload("res://ui/components/xor_truth_t
 # Speed presets: index in OptionButton -> generations per frame.
 # Index 0 is Pause (speed=0); indices 1..6 are 1x..50x.
 const SPEED_PRESETS: Array[int] = [0, 1, 2, 5, 10, 25, 50]
-const DEFAULT_SPEED_INDEX: int = 1  # 1x
 
 @onready var _back_btn: Button = %BackBtn
 @onready var _config_btn: Button = %ConfigBtn
@@ -42,8 +41,6 @@ const DEFAULT_SPEED_INDEX: int = 1  # 1x
 @onready var _status_label: Label = %StatusLabel
 @onready var _solved_label: Label = %SolvedLabel
 @onready var _viz_container: PanelContainer = %VizContainer
-@onready var _help_text: Label = %HelpText
-@onready var _right_tabs: TabContainer = %RightTabs
 @onready var _genome_tab: PanelContainer = %Genome
 @onready var _stats_tab: PanelContainer = %Stats
 @onready var _save_load_tab: PanelContainer = %Saving
@@ -307,25 +304,33 @@ func _input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
-        # Drive the live env visualization every frame, even when paused.
+        # Drive the live env visualization and refresh the status label every
+        # frame, even while a generation is being evaluated. This keeps the
+        # step counter and live env replay responsive during long awaits.
         _drive_live_env()
-        # Step training when speed > 0, not solved, and not already stepping.
-        if _speed == 0 or _solved or _stepping or _disposing:
-                _update_ui()
+        _update_ui()
+        # Start a training step only if we're not already mid-step and speed > 0.
+        if _stepping or _speed == 0 or _solved or _disposing:
                 return
         if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
-                _update_ui()
                 return
+        # Launch the step coroutine; it runs independently of _process and
+        # sets _stepping = false when done. _process keeps firing every frame
+        # for UI updates while the coroutine is running.
         _stepping = true
-        var steps_this_frame: int = 0
-        while steps_this_frame < _speed and _speed > 0 and not _solved and not _disposing:
-                await _step_generation()
-                steps_this_frame += 1
+        _step_budget()
+
+## Run up to `_speed` generations this frame, then clear the stepping flag.
+## Launched as a free-floating coroutine from _process; cancelled automatically
+## when the RunScreen is freed.
+func _step_budget() -> void:
+        var steps_done: int = 0
+        while steps_done < _speed and _speed > 0 and not _solved and not _disposing:
                 if _pop == null or _pop.generation >= int(_extra.get("_max_generations", 200)):
                         break
+                await _step_generation()
+                steps_done += 1
         _stepping = false
-        if not _disposing:
-                _update_ui()
 
 ## Drive the live visualization env with the live genome. This is purely for
 ## display; it does NOT affect fitness (which is computed by the evaluator).

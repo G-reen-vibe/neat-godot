@@ -113,33 +113,32 @@ func _input(event: InputEvent) -> void:
                 match k.keycode:
                         KEY_A:
                                 _pan_input.x = -1.0 if k.pressed else 0.0
-                                _consume(k)
+                                _consume()
                         KEY_D:
                                 _pan_input.x = 1.0 if k.pressed else 0.0
-                                _consume(k)
+                                _consume()
                         KEY_W:
                                 _pan_input.y = -1.0 if k.pressed else 0.0
-                                _consume(k)
+                                _consume()
                         KEY_S:
                                 _pan_input.y = 1.0 if k.pressed else 0.0
-                                _consume(k)
+                                _consume()
                         KEY_EQUAL, KEY_PLUS, KEY_KP_ADD:
                                 if k.pressed:
                                         adjust_zoom(1.2)
-                                        _consume(k)
+                                        _consume()
                         KEY_MINUS, KEY_KP_SUBTRACT:
                                 if k.pressed:
                                         adjust_zoom(1.0 / 1.2)
-                                        _consume(k)
+                                        _consume()
                         KEY_0, KEY_KP_0:
                                 if k.pressed:
                                         reset_view()
-                                        _consume(k)
+                                        _consume()
 
-# Mark the input as handled so it doesn't propagate (e.g. to the run_screen,
-# which would otherwise also receive the WASD keys).
-func _consume(k: InputEventKey) -> void:
-        # Only consume key-down / key-up events (not echo repeats).
+# Mark the current input as handled so it doesn't propagate to the run_screen
+# (which would otherwise also receive the WASD / zoom keys).
+func _consume() -> void:
         get_viewport().set_input_as_handled()
 
 func _draw() -> void:
