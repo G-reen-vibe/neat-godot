@@ -3,12 +3,12 @@
 [ext_resource type="Script" uid="uid://dyokgyg8qnwfk" path="res://ui/screens/run_screen.gd" id="1_rs"]
 
 [sub_resource type="StyleBoxFlat" id="Style_viz_bg"]
-bg_color = Color(0.04, 0.04, 0.07, 1)
+bg_color = Color(0.05, 0.05, 0.08, 1)
 border_width_left = 1
 border_width_right = 1
 border_width_top = 1
 border_width_bottom = 1
-border_color = Color(0.2, 0.2, 0.28, 1)
+border_color = Color(0.22, 0.22, 0.3, 1)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_left = 4
@@ -150,7 +150,7 @@ size_flags_horizontal = 3
 clip_text = true
 theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "P/Run=pause  Space=step once  N=next genome  B=best  ESC=back"
+text = "P/Run=pause  Space=step once  ESC=back"
 
 [node name="RightTabs" type="TabContainer" parent="MainSplit"]
 unique_name_in_owner = true
@@ -158,16 +158,16 @@ custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 clip_contents = true
 
-[node name="GenomeTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+[node name="Genome" type="PanelContainer" parent="MainSplit/RightTabs"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="StatsTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+[node name="Stats" type="PanelContainer" parent="MainSplit/RightTabs"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 
-[node name="SaveLoadTab" type="PanelContainer" parent="MainSplit/RightTabs"]
+[node name="Saving" type="PanelContainer" parent="MainSplit/RightTabs"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
