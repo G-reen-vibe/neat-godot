@@ -1,0 +1,122 @@
+[gd_scene load_steps=12 format=3 uid="uid://pongenv001"]
+
+[ext_resource type="Script" path="res://rl/envs/pong/pong_env.gd" id="1_env"]
+[ext_resource type="Script" path="res://rl/envs/pong/pong_agent.gd" id="2_agent"]
+[ext_resource type="Script" path="res://rl/core/resettable_body_2d.gd" id="3_body"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
+size = Vector2(340, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_paddle"]
+size = Vector2(8, 80)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ball"]
+size = Vector2(12, 12)
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_ball"]
+friction = 0.0
+bounce = 1.0
+absorbent = false
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_paddle"]
+friction = 0.0
+bounce = 1.0
+absorbent = false
+
+[sub_resource type="PhysicsMaterial" id="PhysMat_wall"]
+friction = 0.0
+bounce = 1.0
+absorbent = false
+
+[node name="PongEnv" type="Node2D"]
+script = ExtResource("1_env")
+decision_period = 1
+max_steps = 5000
+
+[node name="TopWall" type="StaticBody2D" parent="."]
+position = Vector2(0, -110)
+physics_material_override = SubResource("PhysMat_wall")
+
+[node name="TopWallShape" type="CollisionShape2D" parent="TopWall"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="TopWallVisual" type="Polygon2D" parent="TopWall"]
+color = Color(0.5, 0.5, 0.55, 1)
+polygon = PackedVector2Array(-170, -10, 170, -10, 170, 10, -170, 10)
+
+[node name="BottomWall" type="StaticBody2D" parent="."]
+position = Vector2(0, 110)
+physics_material_override = SubResource("PhysMat_wall")
+
+[node name="BottomWallShape" type="CollisionShape2D" parent="BottomWall"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="BottomWallVisual" type="Polygon2D" parent="BottomWall"]
+color = Color(0.5, 0.5, 0.55, 1)
+polygon = PackedVector2Array(-170, -10, 170, -10, 170, 10, -170, 10)
+
+[node name="LeftPaddle" type="RigidBody2D" parent="."]
+position = Vector2(-150, 0)
+mass = 100.0
+gravity_scale = 0.0
+lock_rotation = true
+linear_damp = 0.0
+physics_material_override = SubResource("PhysMat_paddle")
+script = ExtResource("3_body")
+kinematic = true
+
+[node name="LeftPaddleShape" type="CollisionShape2D" parent="LeftPaddle"]
+shape = SubResource("RectangleShape2D_paddle")
+
+[node name="LeftPaddleVisual" type="Polygon2D" parent="LeftPaddle"]
+color = Color(0.9, 0.4, 0.4, 1)
+polygon = PackedVector2Array(-4, -40, 4, -40, 4, 40, -4, 40)
+
+[node name="RightPaddle" type="RigidBody2D" parent="."]
+position = Vector2(150, 0)
+mass = 100.0
+gravity_scale = 0.0
+lock_rotation = true
+linear_damp = 0.0
+physics_material_override = SubResource("PhysMat_paddle")
+script = ExtResource("3_body")
+kinematic = true
+
+[node name="RightPaddleShape" type="CollisionShape2D" parent="RightPaddle"]
+shape = SubResource("RectangleShape2D_paddle")
+
+[node name="RightPaddleVisual" type="Polygon2D" parent="RightPaddle"]
+color = Color(0.4, 0.4, 0.9, 1)
+polygon = PackedVector2Array(-4, -40, 4, -40, 4, 40, -4, 40)
+
+[node name="Ball" type="RigidBody2D" parent="."]
+position = Vector2(0, 0)
+mass = 1.0
+gravity_scale = 0.0
+linear_damp = 0.0
+angular_damp = 0.0
+physics_material_override = SubResource("PhysMat_ball")
+script = ExtResource("3_body")
+
+[node name="BallShape" type="CollisionShape2D" parent="Ball"]
+shape = SubResource("RectangleShape2D_ball")
+
+[node name="BallVisual" type="Polygon2D" parent="Ball"]
+color = Color(1, 1, 1, 1)
+polygon = PackedVector2Array(-6, -6, 6, -6, 6, 6, -6, 6)
+
+[node name="LeftAgent" type="Node2D" parent="."]
+script = ExtResource("2_agent")
+side = 0
+paddle_path = NodePath("../LeftPaddle")
+ball_path = NodePath("../Ball")
+
+[node name="RightAgent" type="Node2D" parent="."]
+script = ExtResource("2_agent")
+side = 1
+paddle_path = NodePath("../RightPaddle")
+ball_path = NodePath("../Ball")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 0)
+zoom = Vector2(1.2, 1.2)

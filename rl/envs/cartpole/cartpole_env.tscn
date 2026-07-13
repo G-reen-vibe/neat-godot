@@ -1,0 +1,69 @@
+[gd_scene load_steps=7 format=3 uid="uid://cartpoleenv001"]
+
+[ext_resource type="Script" path="res://rl/envs/cartpole/cartpole_env.gd" id="1_env"]
+[ext_resource type="Script" path="res://rl/envs/cartpole/cartpole_agent.gd" id="2_agent"]
+[ext_resource type="Script" path="res://rl/core/resettable_body_2d.gd" id="3_body"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(800, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cart"]
+size = Vector2(80, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pole"]
+size = Vector2(6, 120)
+
+[node name="CartPoleEnv" type="Node2D"]
+script = ExtResource("1_env")
+decision_period = 1
+max_steps = 10000
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(0, 160)
+
+[node name="GroundShape" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="GroundVisual" type="Polygon2D" parent="Ground"]
+color = Color(0.35, 0.5, 0.3, 1)
+polygon = PackedVector2Array(-400, -10, 400, -10, 400, 10, -400, 10)
+
+[node name="Cart" type="RigidBody2D" parent="."]
+position = Vector2(0, 130)
+mass = 1.0
+gravity_scale = 1.0
+lock_rotation = true
+script = ExtResource("3_body")
+
+[node name="CartShape" type="CollisionShape2D" parent="Cart"]
+shape = SubResource("RectangleShape2D_cart")
+
+[node name="CartVisual" type="Polygon2D" parent="Cart"]
+color = Color(0.4, 0.6, 0.9, 1)
+polygon = PackedVector2Array(-40, -16, 40, -16, 40, 16, -40, 16)
+
+[node name="Pole" type="RigidBody2D" parent="."]
+position = Vector2(0, 54)
+mass = 0.1
+gravity_scale = 1.0
+script = ExtResource("3_body")
+
+[node name="PoleShape" type="CollisionShape2D" parent="Pole"]
+shape = SubResource("RectangleShape2D_pole")
+
+[node name="PoleVisual" type="Polygon2D" parent="Pole"]
+color = Color(0.9, 0.7, 0.3, 1)
+polygon = PackedVector2Array(-3, -60, 3, -60, 3, 60, -3, 60)
+
+[node name="PoleJoint" type="PinJoint2D" parent="."]
+position = Vector2(0, 114)
+node_a = NodePath("../Cart")
+node_b = NodePath("../Pole")
+disable_collision = false
+
+[node name="CartPoleAgent" type="Node2D" parent="."]
+script = ExtResource("2_agent")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 100)
+zoom = Vector2(1.5, 1.5)
