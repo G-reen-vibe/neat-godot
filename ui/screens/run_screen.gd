@@ -378,9 +378,13 @@ func _step_generation() -> void:
                 if fitnesses[i] > _pop.best_fitness:
                         _pop.best_fitness = fitnesses[i]
                         _pop.best_genome = _pop.genomes[i].duplicate()
-        _pop.evolve()
+        # Record stats BEFORE evolve(), so we capture the actual evaluated
+        # fitnesses of this generation. If we record after evolve(), the new
+        # generation's genomes have fitness=0 (unevaluated children) except
+        # elites, making avg look degenerate and best look like a flat line.
         if _stats_tracker != null:
                 _stats_tracker.record(_pop)
+        _pop.evolve()
         # After evolution, the live_idx may be stale (new genomes). Reset to best.
         _live_is_best = true
         _live_idx = -1

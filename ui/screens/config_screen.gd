@@ -418,9 +418,9 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.timestep_steps = 5
         c.forbid_loops = true
         c.init_min_hidden_nodes = 0
-        c.init_max_hidden_nodes = 3
-        c.init_min_connections = 5
-        c.init_max_connections = 20
+        c.init_max_hidden_nodes = 0
+        c.init_min_connections = 1
+        c.init_max_connections = 3
         c.init_weight_min = -1.0
         c.init_weight_max = 1.0
         c.speciation_method = "purge"
@@ -435,7 +435,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.generation_method = "mixed"
         c.crossover_rate = 0.75
         c.elite_count = 1
-        c.interspecies_rate = 0.01
+        c.interspecies_rate = 0.001
         c.selection_method = "roulette"
         c.evaluation_method = "equal"
         c.mutation_policy_method = "general"
@@ -456,7 +456,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.weight_capped_min = -3.0
         c.weight_capped_max = 3.0
         c.enable_connection_mutation = true
-        c.connection_mutation_rate = 0.3
+        c.connection_mutation_rate = 0.05
         c.connection_mutation_min = 0
         c.connection_weight_min = -1.0
         c.connection_weight_max = 1.0
@@ -464,11 +464,11 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.connection_mutator_method = "standard"
         c.connection_selector_method = "standard"
         c.enable_neuron_mutation = true
-        c.neuron_mutation_rate = 0.2
+        c.neuron_mutation_rate = 0.03
         c.neuron_mutation_min = 0
         c.neuron_selector_method = "standard"
         c.enable_enable_mutation = true
-        c.enable_mutation_rate = 0.3
+        c.enable_mutation_rate = 0.05
         c.enable_mutation_min = 0
         c.enable_prune_mutation = false
         c.prune_mutation_rate = 0.01

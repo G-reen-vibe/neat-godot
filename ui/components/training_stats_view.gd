@@ -229,7 +229,7 @@ func _on_fitness_chart_draw() -> void:
         if tracker == null:
                 return
         _draw_line_chart(_fitness_chart, {
-                "Best": {"data": tracker.best_history, "color": COL_ACCENT, "width": 2.0},
+                "Best (gen)": {"data": tracker.gen_best_history, "color": COL_ACCENT, "width": 2.0},
                 "Average": {"data": tracker.avg_history, "color": COL_GREEN, "width": 1.5},
                 "Median": {"data": tracker.median_history, "color": COL_YELLOW, "width": 1.5},
         }, "Fitness Over Generations")
