@@ -188,6 +188,8 @@ class Combine:
 			if ctx.forbid_loops and child.would_create_loop(c.from_node, c.to_node):
 				continue
 			child.add_connection(c.duplicate())
+			# Prune disconnected nodes (child may inherit nodes without connections).
+			child.prune_disconnected_hidden_nodes()
 		return child
 
 
@@ -261,6 +263,8 @@ class Excluded:
 			if not (ctx.forbid_loops and child.would_create_loop(c.from_node, c.to_node)):
 				child.add_connection(c.duplicate())
 			idx += 1
+			# Prune disconnected nodes (child may inherit nodes without connections).
+			child.prune_disconnected_hidden_nodes()
 		return child
 
 	func _is_connected(genome: Genome) -> bool:

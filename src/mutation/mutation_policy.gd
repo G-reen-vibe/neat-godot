@@ -110,6 +110,9 @@ class General:
 				return
 			var idx := ctx.rng.randi_range(0, ops.size() - 1)
 			ops[idx].call(genome, ctx)
+		# Prune any hidden nodes that became disconnected after mutation (e.g.
+		# after prune mutations removed their only incoming/outgoing connection).
+		genome.prune_disconnected_hidden_nodes()
 
 
 ## Phased Pruning policy. Alternates between growth and pruning phases.
@@ -150,3 +153,5 @@ class PhasedPruning:
 			_apply_weight(genome, ctx)
 			_apply_connection(genome, ctx)
 			_apply_neuron(genome, ctx)
+		# Prune any hidden nodes that became disconnected after mutation.
+		genome.prune_disconnected_hidden_nodes()

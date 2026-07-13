@@ -176,6 +176,11 @@ func _build_random_genome(input_ids: Array[int], bias_id: int, output_ids: Array
 				var innov := tracker.get_connection_innov(pair.x, pair.y)
 				var w: float = rng.randf_range(config.init_weight_min, config.init_weight_max)
 				g.add_connection(ConnectionGene.new(innov, pair.x, pair.y, w))
+		# Prune any hidden nodes that ended up with no incoming or no outgoing
+		# connections. This can happen because we add hidden nodes first, then
+		# pick random connections from candidate pairs -- there's no guarantee
+		# every hidden node gets wired in on both sides.
+		g.prune_disconnected_hidden_nodes()
 		return g
 
 ## Build a MutationContext with current state.

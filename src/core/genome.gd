@@ -384,5 +384,51 @@ func _pair_key(a: int, b: int) -> String:
 func mark_dirty() -> void:
 		_topo_dirty = true
 
+## Remove hidden nodes that are structurally disconnected from the network.
+##
+## A hidden node is removed if it has:
+##   - No connections at all (floating node)
+##   - Only incoming connections (dead-end node)
+##   - Only outgoing connections (dead-start node)
+##
+## Input, bias, and output nodes are never removed. Removal is iterative:
+## after removing a node, its connections are also removed, which may cause
+## other nodes to become disconnected. The process repeats until no more
+## hidden nodes can be removed.
+##
+## Under standard NEAT rules (topological mode, no pruning), these dead nodes
+## should never arise because all new nodes are created by splitting a
+## connection (which gives them exactly 1 incoming + 1 outgoing). However,
+## they can appear during:
+##   1. Initial population generation (random hidden nodes + random connections)
+##   2. Crossover (child inherits union of nodes but filtered connections)
+##   3. Prune mutations (if enabled)
+##
+## Returns the total number of hidden nodes removed.
+func prune_disconnected_hidden_nodes() -> int:
+				var total_removed: int = 0
+				while true:
+						var to_remove: Array[int] = []
+						for n: NodeGene in nodes.values():
+								if n.kind != NodeGene.Kind.HIDDEN:
+										continue
+								var has_incoming: bool = false
+								var has_outgoing: bool = false
+								for c: ConnectionGene in connections.values():
+										if c.to_node == n.id:
+												has_incoming = true
+										if c.from_node == n.id:
+												has_outgoing = true
+										if has_incoming and has_outgoing:
+												break
+								if not has_incoming or not has_outgoing:
+										to_remove.append(n.id)
+						if to_remove.is_empty():
+								break
+						for nid: int in to_remove:
+								remove_node(nid)
+						total_removed += to_remove.size()
+				return total_removed
+
 func _to_string() -> String:
 		return "Genome(nodes=%d,conns=%d,fit=%.3f,species=%d)" % [nodes.size(), connections.size(), fitness, species_id]
