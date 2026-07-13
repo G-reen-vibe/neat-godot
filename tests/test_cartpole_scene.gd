@@ -9,7 +9,6 @@ const MAX_GENERATIONS: int = 30
 const POP_SIZE: int = 40
 const NUM_SLOTS: int = 40
 const MAX_STEPS: int = 500
-const SPEEDUP: float = 2.0
 
 var _failed: bool = false
 
@@ -60,7 +59,6 @@ func _test_cartpole() -> void:
         var bias_id: int = 4
         var output_id: int = 5
         var evaluator := SceneEvaluator.new(self, env_scene, NUM_SLOTS, MAX_STEPS + 10, "topological")
-        evaluator.speedup = SPEEDUP
         evaluator.episodes_per_genome = 1
         evaluator.env_setup_fn = func(env: Node) -> void:
                 env.input_node_ids = input_ids
