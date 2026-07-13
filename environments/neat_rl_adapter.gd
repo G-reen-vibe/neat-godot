@@ -173,6 +173,14 @@ func step_env() -> void:
                 _reset_pending = false
                 _step_skipped = true
                 return
+        # Stop stepping once the env is done. Without this, _physics_process
+        # keeps firing after the episode ends (the env is still in the SceneTree),
+        # and step_env would keep accumulating reward (e.g. Pong's _reward stays
+        # at +1 after a score, inflating fitness by +1 per step for the remaining
+        # frames until the SceneEvaluator's step loop notices done and breaks).
+        if _rl_env.is_done() or (_primary_agent != null and _primary_agent.is_done()):
+                _step_skipped = true
+                return
         # Advance the RL env's per-step game logic (scoring, ball speed
         # normalization, etc.). physics_step increments _step_count and calls
         # _on_physics_step.

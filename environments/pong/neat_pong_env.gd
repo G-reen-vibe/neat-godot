@@ -38,6 +38,12 @@ const BALL_HALF_SIZE := 6.0
 var _hits: int = 0
 var _last_ball_vx_sign: float = 0.0
 var _steps: int = 0
+# Cooldown after a detected hit, to avoid double-counting from collision
+# jitter (ball trapped in a paddle causes rapid vx oscillation). The ball
+# crosses the arena (320px) at 200px/s in ~1.6s = ~96 physics steps, so a
+# 10-step cooldown is well below the minimum rally interval.
+var _hit_cooldown: int = 0
+const HIT_COOLDOWN_STEPS: int = 10
 
 
 func _get_rl_env_scene() -> PackedScene:
@@ -54,6 +60,7 @@ func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
         _hits = 0
         _last_ball_vx_sign = 0.0
         _steps = 0
+        _hit_cooldown = 0
 
 
 func step_env() -> void:
@@ -61,9 +68,13 @@ func step_env() -> void:
         if _step_skipped:
                 return
         _steps += 1
+        if _hit_cooldown > 0:
+                _hit_cooldown -= 1
         # Detect paddle hits via ball vx sign change. The ball only flips vx
         # when it hits a paddle (top/bottom walls flip vy, not vx). Within one
         # episode (which ends on first score), vx sign changes = paddle hits.
+        # The cooldown prevents double-counting from collision jitter when the
+        # ball is trapped in a paddle.
         var ball: RigidBody2D = _rl_env.get_node_or_null("Ball") if _rl_env != null else null
         if ball != null:
                 var vx: float = ball.linear_velocity.x
@@ -72,8 +83,9 @@ func step_env() -> void:
                         sign_vx = 1.0
                 elif vx < -1.0:
                         sign_vx = -1.0
-                if sign_vx != 0.0 and _last_ball_vx_sign != 0.0 and sign_vx != _last_ball_vx_sign:
+                if sign_vx != 0.0 and _last_ball_vx_sign != 0.0 and sign_vx != _last_ball_vx_sign and _hit_cooldown == 0:
                         _hits += 1
+                        _hit_cooldown = HIT_COOLDOWN_STEPS
                 if sign_vx != 0.0:
                         _last_ball_vx_sign = sign_vx
 
