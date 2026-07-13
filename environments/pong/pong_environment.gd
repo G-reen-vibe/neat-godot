@@ -4,15 +4,15 @@
 ##   Node2D (root, this script)
 ##     StaticBody2D (top wall)
 ##     StaticBody2D (bottom wall)
-##     StaticBody2D (paddle A - left, player-controlled)
-##     StaticBody2D (paddle B - right, opponent-controlled)
+##     AnimatableBody2D (paddle A - left, player-controlled, sync_to_physics=true)
+##     AnimatableBody2D (paddle B - right, opponent-controlled, sync_to_physics=true)
 ##     RigidBody2D (ball)  -- contact_monitor enabled for hit tracking
 ##     Area2D (left score zone)
 ##     Area2D (right score zone)
 ##
-## Paddles are StaticBody2D so the RigidBody2D ball bounces off them
-## reliably. CharacterBody2D was previously used but caused unreliable
-## collision detection with the RigidBody2D ball.
+## Paddles are AnimatableBody2D (with sync_to_physics=true) so the RigidBody2D
+## ball bounces off them reliably. AnimatableBody2D is designed for moving
+## static colliders and properly handles collision velocity transfer.
 ##
 ## Tournament mode: the genome controls paddle A. An optional opponent genome
 ## controls paddle B. If no opponent, paddle B does not move.
@@ -44,8 +44,8 @@ var _max_steps: int = DEFAULT_MAX_STEPS
 var player_a: Genome = null
 var player_b: Genome = null
 
-@onready var _paddle_a: StaticBody2D = $PaddleA
-@onready var _paddle_b: StaticBody2D = $PaddleB
+@onready var _paddle_a: AnimatableBody2D = $PaddleA
+@onready var _paddle_b: AnimatableBody2D = $PaddleB
 @onready var _ball: RigidBody2D = $Ball
 @onready var _left_zone: Area2D = $LeftScoreZone
 @onready var _right_zone: Area2D = $RightScoreZone
@@ -149,7 +149,7 @@ func interpret_output(output: Dictionary) -> Dictionary:
 func apply_action(action: Dictionary) -> void:
         if _done:
                 return
-        var dt: float = 1.0 / float(Engine.physics_ticks_per_second)
+        var dt: float = get_physics_process_delta_time()
         var a_action: float = float(action.get("a", 0.0))
         # Move paddle A by directly setting position (StaticBody2D has no velocity).
         _paddle_a.position.y += clampf(a_action, -1.0, 1.0) * PADDLE_SPEED * dt

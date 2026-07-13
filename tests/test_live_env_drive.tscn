@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestlivedrive01"]
+
+[ext_resource type="Script" path="res://tests/test_live_env_drive.gd" id="1_ld"]
+
+[node name="TestLiveEnvDrive" type="Node"]
+script = ExtResource("1_ld")

@@ -305,10 +305,9 @@ func _input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
         if not is_visible_in_tree() or _disposing:
                 return
-        # Drive the live env visualization and refresh the status label every
-        # frame, even while a generation is being evaluated. This keeps the
-        # step counter and live env replay responsive during long awaits.
-        _drive_live_env()
+        # Refresh the status label every render frame, even while a generation
+        # is being evaluated. This keeps the step counter and status responsive
+        # during long awaits.
         _update_ui()
         # Start a training step only if we're not already mid-step and speed > 0.
         if _stepping or _speed == 0 or _solved or _disposing:
@@ -320,6 +319,16 @@ func _process(_delta: float) -> void:
         # for UI updates while the coroutine is running.
         _stepping = true
         _step_budget()
+
+## Drive the live env every physics tick. This MUST be in _physics_process,
+## not _process, because apply_action() modifies RigidBody2D state (impulses)
+## and StaticBody2D positions. In Godot 4, physics body modifications outside
+## _physics_process are unreliable — the impulse is applied to a stale physics
+## state and silently lost, making the cart appear frozen.
+func _physics_process(_delta: float) -> void:
+        if not is_visible_in_tree() or _disposing:
+                return
+        _drive_live_env()
 
 ## Run up to `_speed` generations this frame, then clear the stepping flag.
 ## Launched as a free-floating coroutine from _process; cancelled automatically

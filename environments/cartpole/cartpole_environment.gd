@@ -96,10 +96,10 @@ func apply_action(action: Dictionary) -> void:
                 return
         var a: int = int(action.get("action", 0))
         var force: float = FORCE_MAG if a == 1 else -FORCE_MAG
-        # Use the actual physics delta so the impulse is correct regardless of
-        # Engine.physics_ticks_per_second (the SceneEvaluator may raise it for
-        # speedup, which would otherwise double the effective force).
-        var dt: float = 1.0 / float(Engine.physics_ticks_per_second)
+        # Use the actual physics step delta. This accounts for both
+        # Engine.physics_ticks_per_second and Engine.time_scale (during
+        # SceneEvaluator speedup), so the force is correct at any tick rate.
+        var dt: float = get_physics_process_delta_time()
         _cart.apply_central_impulse(Vector2(force * dt * _cart.mass, 0.0))
 
 func is_done() -> bool:
