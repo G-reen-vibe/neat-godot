@@ -694,22 +694,27 @@ These override the NeatConfig defaults when the user starts training from the UI
 
 **Per-environment settings:**
 
+All envs are physics-based (extend `NeatRLAdapter` which wraps an `RLEnvironment`
+from the `rl/` module). Each env's `num_inputs` / `num_outputs` match the RL
+env's `OBS_DIM` / `ACTION_DIM`.
+
 | Env | num_inputs | num_outputs | output_activation | population_size | extra |
 |-----|-----------|-------------|-------------------|-----------------|-------|
-| XOR | 2 | 1 | SIGMOID | 150 | `_solved_threshold = 15.5` |
 | CartPole | 4 | 1 | TANH | 100 | `_max_steps = 500`, `_episodes = 3` |
-| Acrobot | 6 | 1 | TANH | 100 | `_max_steps = 500`, `_episodes = 2` |
-| Pong | 6 | 1 | TANH | 80 | `_points_to_win = 5`, `_episodes = 3` |
+| Pong | 5 | 1 | TANH | 80 | `_max_steps = 1000`, `_episodes = 3` |
+| LunarLander | 6 | 3 | TANH | 100 | `_max_steps = 500`, `_episodes = 3` |
+| BipedalWalker | 8 | 4 | TANH | 100 | `_max_steps = 500`, `_episodes = 2` |
 
-All envs: `_max_generations = 200`, `_speedup = 2.0`.
+All envs: `_max_generations = 999999` (no cap; training runs indefinitely).
 
 ---
 
 ## 16. Evaluators
 
-### Evaluator (non-physics, e.g. XOR)
+### Evaluator (non-physics)
 
-RefCounted, synchronous. Each genome:
+RefCounted, synchronous. Used only by backend unit tests (`MockTestEnv`).
+Each genome:
 1. Create fresh env via `env_factory`.
 2. `env.reset(rng)` with per-genome RNG (`seed = index * 7919 + 1`).
 3. `state = env.initial_state()`
@@ -721,23 +726,24 @@ RefCounted, synchronous. Each genome:
 
 Multi-episodes: averaged. Multi-threaded via `WorkerThreadPool` (each thread gets its own env instance).
 
-### SceneEvaluator (physics, e.g. CartPole/Acrobot/Pong)
+### SceneEvaluator (physics, all user-facing envs)
 
 Node-based, asynchronous (coroutine). Batches N genomes across N SubViewports (each with its own World2D).
 
-1. Allocate pool of `num_slots` SubViewports, each with an env instance.
+1. Allocate pool of `num_slots` SubViewports, each with an env instance (a `NeatRLAdapter` subclass).
 2. `evaluate_all(genomes)`:
-   a. Apply speedup: `Engine.time_scale = speedup`, `Engine.physics_ticks_per_second = base * speedup`.
-   b. Process in batches of `num_slots`.
-   c. For each batch, for each episode:
+   a. Process in batches of `num_slots`.
+   b. For each batch, for each episode:
       - Reset each env with its genome and per-genome-per-episode RNG.
+      - Yield one physics frame so the teleport (queued by reset) applies before the first action.
       - Step loop: apply actions for non-done envs, `await physics_frame`, check done states. Repeat until all done or `max_steps`.
       - Collect `env.current_fitness()` for each.
       - Average over episodes.
-   d. Restore engine settings.
 3. `dispose()`: free all SubViewports.
 
-**Key detail:** The step loop applies actions BEFORE yielding the physics frame. The `is_done()` check happens AFTER the physics frame steps the world. This means an env that becomes done during a physics frame is detected on the next iteration, and its action was already applied (which is fine because `apply_action` checks `_done` internally).
+**No speedup:** The SceneEvaluator does NOT modify `Engine.time_scale` or `Engine.physics_ticks_per_second`. Training runs at the normal 60 Hz physics tick rate. This avoids affecting the live visualization env.
+
+**Key detail:** The step loop applies actions BEFORE yielding the physics frame. The `is_done()` check happens AFTER the physics frame steps the world. The adapter's `step_env()` also checks `is_done()` and returns early if the env is done, preventing reward accumulation after the episode ends.
 
 ---
 
