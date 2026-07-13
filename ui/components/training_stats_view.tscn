@@ -8,52 +8,724 @@ layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-theme_override_constants/separation = 6
+theme_override_constants/separation = 0
 script = ExtResource("1_sv")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_bottom = 8
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
 
-[node name="VBox" type="VBoxContainer" parent="Margin"]
+[node name="VBox" type="VBoxContainer" parent="ScrollContainer"]
 layout_mode = 2
-theme_override_constants/separation = 6
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="Margin/VBox"]
+[node name="OverviewSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
 layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/OverviewSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Overview"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/OverviewSection"]
+layout_mode = 2
+
+[node name="OverviewGrid" type="GridContainer" parent="ScrollContainer/VBox/OverviewSection"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 3
+columns = 4
+
+[node name="L1" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Generation"
+
+[node name="OVGen" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 15
-text = "Training Stats"
+theme_override_font_sizes/font_size = 11
+text = "-"
 
-[node name="BestFitnessLabel" type="Label" parent="Margin/VBox"]
+[node name="L2" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Best: -"
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Pop Size"
 
-[node name="AvgFitnessLabel" type="Label" parent="Margin/VBox"]
+[node name="OVPop" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Avg: -"
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
 
-[node name="SpeciesLabel" type="Label" parent="Margin/VBox"]
+[node name="L3" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Species: -"
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Best (all-time)"
 
-[node name="GenLabel" type="Label" parent="Margin/VBox"]
+[node name="OVBest" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Gen: -"
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 0.85, 0.55, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
 
-[node name="Graph" type="PanelContainer" parent="Margin/VBox"]
+[node name="L4" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Best (this gen)"
+
+[node name="OVGenBest" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="L5" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Average"
+
+[node name="OVAvg" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="L6" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Median"
+
+[node name="OVMedian" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="L7" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Worst"
+
+[node name="OVWorst" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1.0, 0.5, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="L8" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Std Dev"
+
+[node name="OVStd" type="Label" parent="ScrollContainer/VBox/OverviewSection/OverviewGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="FitnessChartSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/FitnessChartSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Fitness History"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/FitnessChartSection"]
+layout_mode = 2
+
+[node name="FitnessChart" type="Panel" parent="ScrollContainer/VBox/FitnessChartSection"]
 custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
-size_flags_vertical = 3
 
-[node name="HistoryList" type="ItemList" parent="Margin/VBox"]
-custom_minimum_size = Vector2(0, 120)
+[node name="TopologySection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/TopologySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Topology"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/TopologySection"]
+layout_mode = 2
+
+[node name="TopologyGrid" type="GridContainer" parent="ScrollContainer/VBox/TopologySection"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 3
+columns = 4
+
+[node name="TL1" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Avg Nodes"
+
+[node name="TPAvgNodes" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="TL2" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Avg Conns"
+
+[node name="TPAvgConns" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="TL3" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Nodes range"
+
+[node name="TPMinMaxNodes" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="TL4" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Conns range"
+
+[node name="TPMinMaxConns" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="TL5" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Enabled Conns"
+
+[node name="TPEnabled" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 0.85, 0.55, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="TL6" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Disabled Conns"
+
+[node name="TPDisabled" type="Label" parent="ScrollContainer/VBox/TopologySection/TopologyGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1.0, 0.5, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="SpeciationSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/SpeciationSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Speciation"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/SpeciationSection"]
+layout_mode = 2
+
+[node name="SpeciationGrid" type="GridContainer" parent="ScrollContainer/VBox/SpeciationSection"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 3
+columns = 4
+
+[node name="SL1" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Species Count"
+
+[node name="SPCount" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="SL2" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Threshold"
+
+[node name="SPThreshold" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="SL3" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Target"
+
+[node name="SPTarget" type="Label" parent="ScrollContainer/VBox/SpeciationSection/SpeciationGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="ThresholdChartSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/ThresholdChartSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Speciation Dynamics"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/ThresholdChartSection"]
+layout_mode = 2
+
+[node name="ThresholdChart" type="Panel" parent="ScrollContainer/VBox/ThresholdChartSection"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+
+[node name="SpeciesTableSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/SpeciesTableSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Species Breakdown"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/SpeciesTableSection"]
+layout_mode = 2
+
+[node name="SpeciesTable" type="GridContainer" parent="ScrollContainer/VBox/SpeciesTableSection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 2
+columns = 4
+
+[node name="H1" type="Label" parent="ScrollContainer/VBox/SpeciesTableSection/SpeciesTable"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 10
+text = "ID"
+
+[node name="H2" type="Label" parent="ScrollContainer/VBox/SpeciesTableSection/SpeciesTable"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 10
+text = "Members"
+
+[node name="H3" type="Label" parent="ScrollContainer/VBox/SpeciesTableSection/SpeciesTable"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 10
+text = "Best Fit"
+
+[node name="H4" type="Label" parent="ScrollContainer/VBox/SpeciesTableSection/SpeciesTable"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 10
+text = "Details"
+
+[node name="ConfigSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/ConfigSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Algorithm Configuration"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/ConfigSection"]
+layout_mode = 2
+
+[node name="ConfigGrid" type="GridContainer" parent="ScrollContainer/VBox/ConfigSection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 2
+columns = 2
+
+[node name="CL0" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV0" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL1" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV1" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL2" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV2" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL3" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV3" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL4" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV4" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL5" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV5" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL6" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV6" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL7" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV7" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL8" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV8" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL9" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV9" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL10" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV10" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL11" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV11" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL12" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV12" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL13" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV13" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL14" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV14" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL15" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV15" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL16" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV16" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL17" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV17" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL18" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV18" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL19" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV19" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL20" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV20" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL21" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV21" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL22" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV22" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CL23" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="CV23" type="Label" parent="ScrollContainer/VBox/ConfigSection/ConfigGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "-"
+
+[node name="HistorySection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="ScrollContainer/VBox/HistorySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.88, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+text = "Generation Log"
+
+[node name="Sep" type="HSeparator" parent="ScrollContainer/VBox/HistorySection"]
+layout_mode = 2
+
+[node name="HistoryList" type="ItemList" parent="ScrollContainer/VBox/HistorySection"]
+custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
 size_flags_vertical = 3
+fixed_column_width = 400

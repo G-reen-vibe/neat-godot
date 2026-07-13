@@ -94,6 +94,7 @@ func setup(env_idx: int, config: NeatConfig, extra: Dictionary, pop: Population)
         _run_pause_btn.button_pressed = false
         _visualizer.population = pop
         _stats_tracker = TrainingStatsTracker.new()
+        _stats_tracker.set_config_snapshot(config)
         _stats_tracker.record(pop)
         _stats_view.tracker = _stats_tracker
         _save_load_view.population = pop
