@@ -1,5 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://brunscreen001"]
 
+
 [ext_resource type="Script" uid="uid://dyokgyg8qnwfk" path="res://ui/screens/run_screen.gd" id="1_rs"]
 
 [sub_resource type="StyleBoxFlat" id="Style_viz_bg"]
@@ -92,14 +93,19 @@ theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
 theme_override_font_sizes/font_size = 13
 text = ""
 
-[node name="VizScroll" type="ScrollContainer" parent="MainSplit/Left"]
+[node name="VizPanel" type="PanelContainer" parent="MainSplit/Left"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("Style_viz_bg")
+
+[node name="VizScroll" type="ScrollContainer" parent="MainSplit/Left/VizPanel"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 clip_contents = true
-theme_override_styles/panel = SubResource("Style_viz_bg")
+horizontal_scroll_mode = 0
 
-[node name="GridContainer" type="GridContainer" parent="MainSplit/Left/VizScroll"]
+[node name="GridContainer" type="GridContainer" parent="MainSplit/Left/VizPanel/VizScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
