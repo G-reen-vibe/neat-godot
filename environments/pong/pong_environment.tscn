@@ -43,23 +43,23 @@ position = Vector2(0, 1.55)
 [node name="BottomWallShape" type="CollisionShape2D" parent="BottomWall"]
 shape = SubResource("Shape_wall_bot")
 
-[node name="PaddleA" type="CharacterBody2D" parent="."]
+[node name="PaddleA" type="StaticBody2D" parent="."]
 position = Vector2(-1.9, 0)
-motion_mode = 1
+physics_material_override = SubResource("PhysMat_paddle")
 
 [node name="PaddleAShape" type="CollisionShape2D" parent="PaddleA"]
 shape = SubResource("Shape_paddle_a")
 
-[node name="PaddleB" type="CharacterBody2D" parent="."]
+[node name="PaddleB" type="StaticBody2D" parent="."]
 position = Vector2(1.9, 0)
-motion_mode = 1
+physics_material_override = SubResource("PhysMat_paddle")
 
 [node name="PaddleBShape" type="CollisionShape2D" parent="PaddleB"]
 shape = SubResource("Shape_paddle_b")
 
 [node name="Ball" type="RigidBody2D" parent="."]
 position = Vector2(0, 0)
-mass = 0.001
+mass = 1.0
 gravity_scale = 0.0
 linear_damp = 0.0
 can_sleep = false

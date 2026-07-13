@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://btestcartphys001"]
+
+[ext_resource type="Script" path="res://tests/test_cartpole_physics.gd" id="1_cp"]
+
+[node name="TestCartpolePhysics" type="Node"]
+script = ExtResource("1_cp")

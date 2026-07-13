@@ -106,6 +106,7 @@ func _test_env(env_idx: int) -> void:
                 extra["_points_to_win"] = 3
                 extra["_episodes"] = 1
                 extra["_speedup"] = 2.0
+                extra["_max_steps"] = 200
         config_screen.start_requested.emit(cfg, extra)
         await get_tree().process_frame
         await get_tree().process_frame

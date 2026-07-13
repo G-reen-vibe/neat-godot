@@ -223,6 +223,7 @@ func _make_env_setup_fn() -> Callable:
                                 env.bias_node_id = bias_id
                                 env.output_node_id = output_start
                                 env.points_to_win = points_to_win
+                                env.set_max_steps(max_steps)
                                 env.set_player_b(null)
                                 env.set_forward_mode(fwd_mode)
         return Callable()

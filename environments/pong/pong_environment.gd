@@ -4,11 +4,15 @@
 ##   Node2D (root, this script)
 ##     StaticBody2D (top wall)
 ##     StaticBody2D (bottom wall)
-##     CharacterBody2D (paddle A - left, player-controlled)
-##     CharacterBody2D (paddle B - right, opponent-controlled)
+##     StaticBody2D (paddle A - left, player-controlled)
+##     StaticBody2D (paddle B - right, opponent-controlled)
 ##     RigidBody2D (ball)  -- contact_monitor enabled for hit tracking
 ##     Area2D (left score zone)
 ##     Area2D (right score zone)
+##
+## Paddles are StaticBody2D so the RigidBody2D ball bounces off them
+## reliably. CharacterBody2D was previously used but caused unreliable
+## collision detection with the RigidBody2D ball.
 ##
 ## Tournament mode: the genome controls paddle A. An optional opponent genome
 ## controls paddle B. If no opponent, paddle B does not move.
@@ -28,18 +32,20 @@ const PADDLE_SPEED: float = 4.0
 const BALL_SPEED: float = 4.0
 const BALL_RADIUS: float = 0.05
 const PADDLE_MARGIN: float = 0.1
-const MAX_STEPS: int = 1200
+const DEFAULT_MAX_STEPS: int = 1200
 
 # Configurable: points needed to win a match.
 var points_to_win: int = 5
+# Configurable: max steps per episode (set by env_setup_fn).
+var _max_steps: int = DEFAULT_MAX_STEPS
 
 # Player genomes (genome A is "us", genome B is the opponent). Either may be
 # null (opponent null = nonmoving paddle).
 var player_a: Genome = null
 var player_b: Genome = null
 
-@onready var _paddle_a: CharacterBody2D = $PaddleA
-@onready var _paddle_b: CharacterBody2D = $PaddleB
+@onready var _paddle_a: StaticBody2D = $PaddleA
+@onready var _paddle_b: StaticBody2D = $PaddleB
 @onready var _ball: RigidBody2D = $Ball
 @onready var _left_zone: Area2D = $LeftScoreZone
 @onready var _right_zone: Area2D = $RightScoreZone
@@ -61,203 +67,195 @@ var _ball_reset_dir: float = 1.0
 var _prev_ball_vx_sign: int = 0  # for hit detection backup
 
 func _ready() -> void:
-	_initial_ball_pos = _ball.position
-	_initial_paddle_a_pos = _paddle_a.position
-	_initial_paddle_b_pos = _paddle_b.position
-	# Connect ball body_entered for hit tracking.
-	if not _ball.body_entered.is_connected(_on_ball_body_entered):
-		_ball.body_entered.connect(_on_ball_body_entered)
+        _initial_ball_pos = _ball.position
+        _initial_paddle_a_pos = _paddle_a.position
+        _initial_paddle_b_pos = _paddle_b.position
+        # Connect ball body_entered for hit tracking.
+        if not _ball.body_entered.is_connected(_on_ball_body_entered):
+                _ball.body_entered.connect(_on_ball_body_entered)
 
-func set_max_steps(_p: int) -> void:
-	# Pong uses its own MAX_STEPS const; ignore.
-	pass
+func set_max_steps(p: int) -> void:
+        _max_steps = p
 
 func set_player_a(g: Genome) -> void:
-	player_a = g
+        player_a = g
 
 func set_player_b(g: Genome) -> void:
-	player_b = g
+        player_b = g
 
 func set_forward_mode(m: String) -> void:
-	forward_mode = m
+        forward_mode = m
 
 func reset(p_genome = null, rng: RandomNumberGenerator = null) -> void:
-	super.reset(p_genome, rng)
-	player_a = p_genome
-	_score_a = 0
-	_score_b = 0
-	_steps = 0
-	_done = false
-	_hits_a = 0
-	_hits_b = 0
-	_ball_pending_reset = false
-	_prev_ball_vx_sign = 0
-	_paddle_a.position = _initial_paddle_a_pos
-	_paddle_a.velocity = Vector2.ZERO
-	_paddle_b.position = _initial_paddle_b_pos
-	_paddle_b.velocity = Vector2.ZERO
-	_ball.position = _initial_ball_pos
-	_ball.linear_velocity = Vector2.ZERO
-	_ball.angular_velocity = 0.0
-	# Initial ball direction.
-	var dir: float = 1.0
-	if rng != null:
-		dir = 1.0 if rng.randf() < 0.5 else -1.0
-		_ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, rng.randf_range(-0.8, 0.8))
-	else:
-		_ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, randf_range(-0.8, 0.8))
-	_prev_ball_vx_sign = sign(_ball.linear_velocity.x)
+        super.reset(p_genome, rng)
+        player_a = p_genome
+        _score_a = 0
+        _score_b = 0
+        _steps = 0
+        _done = false
+        _hits_a = 0
+        _hits_b = 0
+        _ball_pending_reset = false
+        _prev_ball_vx_sign = 0
+        _paddle_a.position = _initial_paddle_a_pos
+        _paddle_b.position = _initial_paddle_b_pos
+        _ball.position = _initial_ball_pos
+        _ball.linear_velocity = Vector2.ZERO
+        _ball.angular_velocity = 0.0
+        # Initial ball direction.
+        var dir: float = 1.0
+        if rng != null:
+                dir = 1.0 if rng.randf() < 0.5 else -1.0
+                _ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, rng.randf_range(-0.8, 0.8))
+        else:
+                _ball.linear_velocity = Vector2(dir * BALL_SPEED * 0.7, randf_range(-0.8, 0.8))
+        _prev_ball_vx_sign = sign(_ball.linear_velocity.x)
 
 func get_state() -> Dictionary:
-	return _build_state_dict_for_a()
+        return _build_state_dict_for_a()
 
 func _build_state_dict_for_a() -> Dictionary:
-	var d: Dictionary = {}
-	d[input_node_ids[0]] = _ball.position.x / (FIELD_WIDTH * 0.5)
-	d[input_node_ids[1]] = _ball.position.y / (FIELD_HEIGHT * 0.5)
-	d[input_node_ids[2]] = _ball.linear_velocity.x / BALL_SPEED
-	d[input_node_ids[3]] = _ball.linear_velocity.y / BALL_SPEED
-	d[input_node_ids[4]] = _paddle_a.position.y / (FIELD_HEIGHT * 0.5)
-	d[input_node_ids[5]] = _paddle_b.position.y / (FIELD_HEIGHT * 0.5)
-	return d
+        var d: Dictionary = {}
+        d[input_node_ids[0]] = _ball.position.x / (FIELD_WIDTH * 0.5)
+        d[input_node_ids[1]] = _ball.position.y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[2]] = _ball.linear_velocity.x / BALL_SPEED
+        d[input_node_ids[3]] = _ball.linear_velocity.y / BALL_SPEED
+        d[input_node_ids[4]] = _paddle_a.position.y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[5]] = _paddle_b.position.y / (FIELD_HEIGHT * 0.5)
+        return d
 
 func _build_state_dict_for_b() -> Dictionary:
-	var d: Dictionary = {}
-	d[input_node_ids[0]] = -_ball.position.x / (FIELD_WIDTH * 0.5)
-	d[input_node_ids[1]] = _ball.position.y / (FIELD_HEIGHT * 0.5)
-	d[input_node_ids[2]] = -_ball.linear_velocity.x / BALL_SPEED
-	d[input_node_ids[3]] = _ball.linear_velocity.y / BALL_SPEED
-	d[input_node_ids[4]] = _paddle_b.position.y / (FIELD_HEIGHT * 0.5)
-	d[input_node_ids[5]] = _paddle_a.position.y / (FIELD_HEIGHT * 0.5)
-	return d
+        var d: Dictionary = {}
+        d[input_node_ids[0]] = -_ball.position.x / (FIELD_WIDTH * 0.5)
+        d[input_node_ids[1]] = _ball.position.y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[2]] = -_ball.linear_velocity.x / BALL_SPEED
+        d[input_node_ids[3]] = _ball.linear_velocity.y / BALL_SPEED
+        d[input_node_ids[4]] = _paddle_b.position.y / (FIELD_HEIGHT * 0.5)
+        d[input_node_ids[5]] = _paddle_a.position.y / (FIELD_HEIGHT * 0.5)
+        return d
 
 func get_state_for_player(player: int) -> Dictionary:
-	if player == 1:
-		return _build_state_dict_for_b()
-	return _build_state_dict_for_a()
+        if player == 1:
+                return _build_state_dict_for_b()
+        return _build_state_dict_for_a()
 
 func interpret_output(output: Dictionary) -> Dictionary:
-	var a_action: float = float(output.get(output_node_id, 0.0))
-	return {"a": a_action}
+        var a_action: float = float(output.get(output_node_id, 0.0))
+        return {"a": a_action}
 
 ## Apply both players' actions. If player_b is set, run its forward pass too.
+## Paddles are StaticBody2D, so we move them by setting position directly.
+## Movement uses the physics delta so speed is correct at any tick rate.
 func apply_action(action: Dictionary) -> void:
-	if _done:
-		return
-	var a_action: float = float(action.get("a", 0.0))
-	# Move paddle A.
-	var a_vel: Vector2 = Vector2(0, clampf(a_action, -1.0, 1.0) * PADDLE_SPEED)
-	_paddle_a.velocity = a_vel
-	# Move paddle B (if opponent exists).
-	if player_b != null:
-		var state_b: Dictionary = _build_state_dict_for_b()
-		var output_b: Dictionary = player_b.forward(state_b, forward_mode)
-		var b_action: float = float(output_b.get(output_node_id, 0.0))
-		_paddle_b.velocity = Vector2(0, clampf(b_action, -1.0, 1.0) * PADDLE_SPEED)
-	else:
-		_paddle_b.velocity = Vector2.ZERO
+        if _done:
+                return
+        var dt: float = 1.0 / float(Engine.physics_ticks_per_second)
+        var a_action: float = float(action.get("a", 0.0))
+        # Move paddle A by directly setting position (StaticBody2D has no velocity).
+        _paddle_a.position.y += clampf(a_action, -1.0, 1.0) * PADDLE_SPEED * dt
+        # Move paddle B (if opponent exists).
+        if player_b != null:
+                var state_b: Dictionary = _build_state_dict_for_b()
+                var output_b: Dictionary = player_b.forward(state_b, forward_mode)
+                var b_action: float = float(output_b.get(output_node_id, 0.0))
+                _paddle_b.position.y += clampf(b_action, -1.0, 1.0) * PADDLE_SPEED * dt
+        # Clamp paddles to field.
+        var half_p: float = FIELD_HEIGHT * 0.5 - PADDLE_HEIGHT * 0.5
+        _paddle_a.position.y = clampf(_paddle_a.position.y, -half_p, half_p)
+        _paddle_b.position.y = clampf(_paddle_b.position.y, -half_p, half_p)
 
 func _on_ball_body_entered(body: Node) -> void:
-	if _done:
-		return
-	if body == _paddle_a:
-		_hits_a += 1
-	elif body == _paddle_b:
-		_hits_b += 1
+        if _done:
+                return
+        if body == _paddle_a:
+                _hits_a += 1
+        elif body == _paddle_b:
+                _hits_b += 1
 
 func _physics_process(_delta: float) -> void:
-	if _done:
-		return
-	_steps += 1
-	# Move CharacterBody2D paddles.
-	_paddle_a.move_and_slide()
-	_paddle_b.move_and_slide()
-	# Clamp paddles to field.
-	var half_p: float = FIELD_HEIGHT * 0.5 - PADDLE_HEIGHT * 0.5
-	_paddle_a.position.y = clampf(_paddle_a.position.y, -half_p, half_p)
-	_paddle_b.position.y = clampf(_paddle_b.position.y, -half_p, half_p)
-	# Handle ball reset (after a goal).
-	if _ball_pending_reset:
-		_ball.position = _initial_ball_pos
-		_ball.linear_velocity = Vector2(_ball_reset_dir * BALL_SPEED * 0.7, randf_range(-0.5, 0.5))
-		_ball.angular_velocity = 0.0
-		_ball_pending_reset = false
-		_prev_ball_vx_sign = sign(_ball.linear_velocity.x)
-	# Backup hit detection: if ball vx sign flipped near a paddle, count a hit.
-	# This catches hits the body_entered signal may have missed (e.g. when the
-	# physics step is too coarse).
-	var cur_vx_sign: int = sign(_ball.linear_velocity.x)
-	if cur_vx_sign != 0 and _prev_ball_vx_sign != 0 and cur_vx_sign != _prev_ball_vx_sign:
-		var abs_vx: float = absf(_ball.linear_velocity.x)
-		# Ball is near paddle A?
-		if absf(_ball.position.x - _paddle_a.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
-			# Only count if moving away from paddle A (positive vx) and was previously moving toward (negative).
-			if cur_vx_sign > 0 and _prev_ball_vx_sign < 0:
-				_hits_a += 1
-		elif absf(_ball.position.x - _paddle_b.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
-			if cur_vx_sign < 0 and _prev_ball_vx_sign > 0:
-				_hits_b += 1
-	_prev_ball_vx_sign = cur_vx_sign
-	# Check score zones.
-	if _ball.position.x < -FIELD_WIDTH * 0.5:
-		_score_b += 1
-		_ball_pending_reset = true
-		_ball_reset_dir = 1.0
-	elif _ball.position.x > FIELD_WIDTH * 0.5:
-		_score_a += 1
-		_ball_pending_reset = true
-		_ball_reset_dir = -1.0
-	# Clamp ball speed (avoid runaway from bouncy physics).
-	var speed: float = _ball.linear_velocity.length()
-	if speed > BALL_SPEED * 1.5:
-		_ball.linear_velocity = _ball.linear_velocity.normalized() * BALL_SPEED * 1.5
-	# Check win condition.
-	if _score_a >= points_to_win or _score_b >= points_to_win:
-		_done = true
-	elif _steps >= MAX_STEPS:
-		_done = true
+        if _done:
+                return
+        _steps += 1
+        # Handle ball reset (after a goal). Must happen BEFORE score check
+        # to prevent multi-score in a single frame.
+        if _ball_pending_reset:
+                _ball.position = _initial_ball_pos
+                _ball.linear_velocity = Vector2(_ball_reset_dir * BALL_SPEED * 0.7, randf_range(-0.5, 0.5))
+                _ball.angular_velocity = 0.0
+                _ball_pending_reset = false
+                _prev_ball_vx_sign = sign(_ball.linear_velocity.x)
+        # Backup hit detection: if ball vx sign flipped near a paddle, count a hit.
+        var cur_vx_sign: int = sign(_ball.linear_velocity.x)
+        if cur_vx_sign != 0 and _prev_ball_vx_sign != 0 and cur_vx_sign != _prev_ball_vx_sign:
+                var abs_vx: float = absf(_ball.linear_velocity.x)
+                if absf(_ball.position.x - _paddle_a.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
+                        if cur_vx_sign > 0 and _prev_ball_vx_sign < 0:
+                                _hits_a += 1
+                elif absf(_ball.position.x - _paddle_b.position.x) < PADDLE_WIDTH * 4.0 + abs_vx * 0.05:
+                        if cur_vx_sign < 0 and _prev_ball_vx_sign > 0:
+                                _hits_b += 1
+        _prev_ball_vx_sign = cur_vx_sign
+        # Check score zones. Setting _ball_pending_reset ensures the ball is
+        # recentered on the NEXT frame, preventing multi-score.
+        if _ball.position.x < -FIELD_WIDTH * 0.5:
+                _score_b += 1
+                _ball_pending_reset = true
+                _ball_reset_dir = 1.0
+        elif _ball.position.x > FIELD_WIDTH * 0.5:
+                _score_a += 1
+                _ball_pending_reset = true
+                _ball_reset_dir = -1.0
+        # Clamp ball speed (avoid runaway from bouncy physics).
+        var speed: float = _ball.linear_velocity.length()
+        if speed > BALL_SPEED * 1.5:
+                _ball.linear_velocity = _ball.linear_velocity.normalized() * BALL_SPEED * 1.5
+        # Check win condition.
+        if _score_a >= points_to_win or _score_b >= points_to_win:
+                _done = true
+        elif _steps >= _max_steps:
+                _done = true
 
 func is_done() -> bool:
-	return _done
+        return _done
 
 func current_fitness() -> float:
-	# Reward hits heavily (the main skill), reward scoring, penalize being scored on.
-	# Add small survival bonus so early generations still progress.
-	var score: float = 0.0
-	score += float(_hits_a) * 1.0
-	score += float(_score_a) * 5.0
-	score -= float(_score_b) * 2.0
-	if _score_a > _score_b:
-		score += 10.0
-	score += float(_steps) * 0.01
-	return maxf(0.0, score)
+        # Reward hits heavily (the main skill), reward scoring, penalize being scored on.
+        # Add small survival bonus so early generations still progress.
+        var score: float = 0.0
+        score += float(_hits_a) * 1.0
+        score += float(_score_a) * 5.0
+        score -= float(_score_b) * 2.0
+        if _score_a > _score_b:
+                score += 10.0
+        score += float(_steps) * 0.01
+        return maxf(0.0, score)
 
 func is_solved() -> bool:
-	return _score_a >= points_to_win and _score_a > _score_b
+        return _score_a >= points_to_win and _score_a > _score_b
 
 func view_type() -> String:
-	return "2d"
+        return "2d"
 
 func get_visual_state() -> Dictionary:
-	return {
-		"ball_x": _ball.position.x,
-		"ball_y": _ball.position.y,
-		"ball_vx": _ball.linear_velocity.x,
-		"ball_vy": _ball.linear_velocity.y,
-		"paddle_a_y": _paddle_a.position.y,
-		"paddle_b_y": _paddle_b.position.y,
-		"score_a": _score_a,
-		"score_b": _score_b,
-		"steps": _steps,
-		"max_steps": MAX_STEPS,
-		"done": _done,
-		"field_width": FIELD_WIDTH,
-		"field_height": FIELD_HEIGHT,
-		"paddle_height": PADDLE_HEIGHT,
-		"paddle_width": PADDLE_WIDTH,
-		"paddle_margin": PADDLE_MARGIN,
-		"ball_radius": BALL_RADIUS,
-		"points_to_win": points_to_win,
-		"hits_a": _hits_a,
-		"hits_b": _hits_b,
-	}
+        return {
+                "ball_x": _ball.position.x,
+                "ball_y": _ball.position.y,
+                "ball_vx": _ball.linear_velocity.x,
+                "ball_vy": _ball.linear_velocity.y,
+                "paddle_a_y": _paddle_a.position.y,
+                "paddle_b_y": _paddle_b.position.y,
+                "score_a": _score_a,
+                "score_b": _score_b,
+                "steps": _steps,
+                "max_steps": _max_steps,
+                "done": _done,
+                "field_width": FIELD_WIDTH,
+                "field_height": FIELD_HEIGHT,
+                "paddle_height": PADDLE_HEIGHT,
+                "paddle_width": PADDLE_WIDTH,
+                "paddle_margin": PADDLE_MARGIN,
+                "ball_radius": BALL_RADIUS,
+                "points_to_win": points_to_win,
+                "hits_a": _hits_a,
+                "hits_b": _hits_b,
+        }
