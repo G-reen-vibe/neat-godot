@@ -400,13 +400,6 @@ func _update_ui() -> void:
         if _pop == null:
                 return
         var max_gen: int = int(_extra.get("_max_generations", 200))
-        var avg_conns: float = 0.0
-        var avg_nodes: float = 0.0
-        for g: Genome in _pop.genomes:
-                avg_conns += g.connection_count()
-                avg_nodes += g.node_count()
-        avg_conns /= float(maxi(1, _pop.genomes.size()))
-        avg_nodes /= float(maxi(1, _pop.genomes.size()))
         # Build a clear multi-part status string.
         var live_str: String
         if _live_is_best or _live_idx < 0 or _live_idx >= _pop.genomes.size():
