@@ -72,16 +72,16 @@ var threshold_up_speed: float = 0.3
 var threshold_down_speed: float = 0.3
 # Backwards-compat: sets both up and down.
 var threshold_adjustment_speed: float:
-		get:
-				return threshold_up_speed
-		set(v):
-				threshold_up_speed = v
-				threshold_down_speed = v
+                get:
+                                return threshold_up_speed
+                set(v):
+                                threshold_up_speed = v
+                                threshold_down_speed = v
 # Merge ratio: species closer than threshold x merge_ratio are merged.
 var merge_ratio: float = 0.5
 # Min/max bounds for the threshold.
 var min_threshold: float = 0.5
-var max_threshold: float = 15.0
+var max_threshold: float = 30.0
 
 # --- Evaluation ---
 # "equal", "improvement_rate", "novelty".
@@ -163,174 +163,174 @@ var forbid_loops: bool = true  # Required for topological mode.
 ## Returns a Dictionary with keys: similarity, speciation, evaluation, generation,
 ## mutation_policy, overall_crossover, neuron_crossover.
 func build_strategies() -> Dictionary:
-		var out: Dictionary = {}
-		# Similarity
-		match similarity_method:
-				"percentage":
-						out["similarity"] = SimilarityTest.Percentage.new()
-				_:
-						out["similarity"] = SimilarityTest.Standard.new(similarity_c1, similarity_c2, similarity_c3, similarity_n_threshold)
-		# Mutation policy
-		out["mutation_policy"] = _build_mutation_policy()
-		# Crossover
-		var nc := _build_neuron_crossover()
-		out["neuron_crossover"] = nc
-		out["overall_crossover"] = _build_overall_crossover(nc)
-		# Speciation
-		match speciation_method:
-				"single":
-						out["speciation"] = SpeciationStrategy.Single.new()
-				"kmedian":
-						out["speciation"] = SpeciationStrategy.KMedian.new(target_species_count, 5)
-				"purge":
-						# Build a Standard delegate with the config's parameters so that
-						# subsequent generations (after the first) use the configured
-						# threshold dynamics, not defaults.
-						var purge_std := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
-						purge_std.threshold_up_speed = threshold_up_speed
-						purge_std.threshold_down_speed = threshold_down_speed
-						purge_std.max_species_count = max_species_count
-						purge_std.merge_ratio = merge_ratio
-						purge_std.min_threshold = min_threshold
-						purge_std.max_threshold = max_threshold
-						out["speciation"] = SpeciationStrategy.Purge.new(out["mutation_policy"], purge_std, target_species_count)
-				_:
-						var std_sp := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
-						std_sp.threshold_up_speed = threshold_up_speed
-						std_sp.threshold_down_speed = threshold_down_speed
-						std_sp.max_species_count = max_species_count
-						std_sp.merge_ratio = merge_ratio
-						std_sp.min_threshold = min_threshold
-						std_sp.max_threshold = max_threshold
-						out["speciation"] = std_sp
-		# Evaluation
-		match evaluation_method:
-				"improvement_rate":
-						out["evaluation"] = EvaluationStrategy.ImprovementRate.new()
-				"novelty":
-						out["evaluation"] = EvaluationStrategy.Novelty.new(out["similarity"], novelty_weight)
-				_:
-						out["evaluation"] = EvaluationStrategy.Equal.new()
-		# Generation
-		var gs: GenerationStrategy
-		match generation_method:
-				"crossover":
-						gs = GenerationStrategy.Crossover.new(out["mutation_policy"], out["overall_crossover"])
-				"mixed":
-						gs = GenerationStrategy.Mixed.new(out["mutation_policy"], out["overall_crossover"], crossover_rate)
-				_:
-						gs = GenerationStrategy.Asexual.new(out["mutation_policy"])
-		gs.elite_count = elite_count
-		gs.interspecies_rate = interspecies_rate
-		gs.selection_method = selection_method
-		out["generation"] = gs
-		return out
+                var out: Dictionary = {}
+                # Similarity
+                match similarity_method:
+                                "percentage":
+                                                out["similarity"] = SimilarityTest.Percentage.new()
+                                _:
+                                                out["similarity"] = SimilarityTest.Standard.new(similarity_c1, similarity_c2, similarity_c3, similarity_n_threshold)
+                # Mutation policy
+                out["mutation_policy"] = _build_mutation_policy()
+                # Crossover
+                var nc := _build_neuron_crossover()
+                out["neuron_crossover"] = nc
+                out["overall_crossover"] = _build_overall_crossover(nc)
+                # Speciation
+                match speciation_method:
+                                "single":
+                                                out["speciation"] = SpeciationStrategy.Single.new()
+                                "kmedian":
+                                                out["speciation"] = SpeciationStrategy.KMedian.new(target_species_count, 5)
+                                "purge":
+                                                # Build a Standard delegate with the config's parameters so that
+                                                # subsequent generations (after the first) use the configured
+                                                # threshold dynamics, not defaults.
+                                                var purge_std := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
+                                                purge_std.threshold_up_speed = threshold_up_speed
+                                                purge_std.threshold_down_speed = threshold_down_speed
+                                                purge_std.max_species_count = max_species_count
+                                                purge_std.merge_ratio = merge_ratio
+                                                purge_std.min_threshold = min_threshold
+                                                purge_std.max_threshold = max_threshold
+                                                out["speciation"] = SpeciationStrategy.Purge.new(out["mutation_policy"], purge_std, target_species_count)
+                                _:
+                                                var std_sp := SpeciationStrategy.Standard.new(compatibility_threshold, target_species_count)
+                                                std_sp.threshold_up_speed = threshold_up_speed
+                                                std_sp.threshold_down_speed = threshold_down_speed
+                                                std_sp.max_species_count = max_species_count
+                                                std_sp.merge_ratio = merge_ratio
+                                                std_sp.min_threshold = min_threshold
+                                                std_sp.max_threshold = max_threshold
+                                                out["speciation"] = std_sp
+                # Evaluation
+                match evaluation_method:
+                                "improvement_rate":
+                                                out["evaluation"] = EvaluationStrategy.ImprovementRate.new()
+                                "novelty":
+                                                out["evaluation"] = EvaluationStrategy.Novelty.new(out["similarity"], novelty_weight)
+                                _:
+                                                out["evaluation"] = EvaluationStrategy.Equal.new()
+                # Generation
+                var gs: GenerationStrategy
+                match generation_method:
+                                "crossover":
+                                                gs = GenerationStrategy.Crossover.new(out["mutation_policy"], out["overall_crossover"])
+                                "mixed":
+                                                gs = GenerationStrategy.Mixed.new(out["mutation_policy"], out["overall_crossover"], crossover_rate)
+                                _:
+                                                gs = GenerationStrategy.Asexual.new(out["mutation_policy"])
+                gs.elite_count = elite_count
+                gs.interspecies_rate = interspecies_rate
+                gs.selection_method = selection_method
+                out["generation"] = gs
+                return out
 
 func _build_mutation_policy() -> MutationPolicy:
-		var pol: MutationPolicy
-		match mutation_policy_method:
-				"phased_pruning":
-						var pp := MutationPolicy.PhasedPruning.new(phased_phase_length, phased_pruning_rate_multiplier)
-						pol = pp
-				_:
-						pol = MutationPolicy.General.new(mutation_stacked, mutation_rate_multiplier)
-		# Weight selector/mutator
-		if enable_weight_mutation:
-				var ws: WeightSelector
-				match weight_selector_method:
-						"capped":
-								ws = WeightSelector.Capped.new(weight_mutation_min, weight_mutation_rate, weight_capped_min, weight_capped_max)
-						_:
-								ws = WeightSelector.Standard.new(weight_mutation_min, weight_mutation_rate)
-				var wm: WeightMutator
-				match weight_mutator_method:
-						"normal":
-								if weight_mutation_mode == "all":
-										wm = WeightMutator.Normal.new(0.0, weight_mutation_normal_std * weight_mutation_all_scale)
-								else:
-										wm = WeightMutator.Normal.new(0.0, weight_mutation_normal_std)
-						_:
-								if weight_mutation_mode == "all":
-										wm = WeightMutator.Standard.new(weight_mutation_delta_min * weight_mutation_all_scale, weight_mutation_delta_max * weight_mutation_all_scale)
-								else:
-										wm = WeightMutator.Standard.new(weight_mutation_delta_min, weight_mutation_delta_max)
-				# In "all" mode, override the selector to return ALL enabled connections.
-				if weight_mutation_mode == "all":
-						ws = WeightSelector.All.new()
-				pol.weight_selector = ws
-				pol.weight_mutator = wm
-		# Connection selector/mutator
-		if enable_connection_mutation:
-				var cs: ConnectionSelector
-				match connection_selector_method:
-						"least_used":
-								cs = ConnectionSelector.LeastUsed.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
-						"least_common":
-								cs = ConnectionSelector.LeastCommon.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
-						_:
-								cs = ConnectionSelector.Standard.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
-				var cm: ConnectionMutator
-				match connection_mutator_method:
-						"normal":
-								cm = ConnectionMutator.Normal.new(0.0, connection_weight_normal_std)
-						"safe_gradient":
-								cm = ConnectionMutator.SafeGradient.new()
-						_:
-								cm = ConnectionMutator.Standard.new(connection_weight_min, connection_weight_max)
-				pol.connection_selector = cs
-				pol.connection_mutator = cm
-		# Neuron selector/mutator
-		if enable_neuron_mutation:
-				var ns: NeuronSelector
-				match neuron_selector_method:
-						"least_common":
-								ns = NeuronSelector.LeastCommon.new(neuron_mutation_min, neuron_mutation_rate)
-						_:
-								ns = NeuronSelector.Standard.new(neuron_mutation_min, neuron_mutation_rate)
-				var nm := NeuronMutator.Standard.new(hidden_activation)
-				pol.neuron_selector = ns
-				pol.neuron_mutator = nm
-		# Prune selector/mutator
-		if enable_prune_mutation:
-				var ps: PruneSelector
-				match prune_selector_method:
-						"least_weight":
-								ps = PruneSelector.LeastWeight.new(prune_mutation_min, prune_mutation_rate)
-						_:
-								ps = PruneSelector.Standard.new(prune_mutation_min, prune_mutation_rate)
-				var pm: PruneMutator
-				match prune_mutator_method:
-						"non_essential":
-								pm = PruneMutator.PruneNonEssential.new()
-						"merge":
-								pm = PruneMutator.MergePair.new()
-						_:
-								pm = PruneMutator.PruneDisabled.new()
-				pol.prune_selector = ps
-				pol.prune_mutator = pm
-		# Enable selector
-		if enable_enable_mutation:
-				pol.enable_selector = EnableSelector.Standard.new(enable_mutation_min, enable_mutation_rate)
-		return pol
+                var pol: MutationPolicy
+                match mutation_policy_method:
+                                "phased_pruning":
+                                                var pp := MutationPolicy.PhasedPruning.new(phased_phase_length, phased_pruning_rate_multiplier)
+                                                pol = pp
+                                _:
+                                                pol = MutationPolicy.General.new(mutation_stacked, mutation_rate_multiplier)
+                # Weight selector/mutator
+                if enable_weight_mutation:
+                                var ws: WeightSelector
+                                match weight_selector_method:
+                                                "capped":
+                                                                ws = WeightSelector.Capped.new(weight_mutation_min, weight_mutation_rate, weight_capped_min, weight_capped_max)
+                                                _:
+                                                                ws = WeightSelector.Standard.new(weight_mutation_min, weight_mutation_rate)
+                                var wm: WeightMutator
+                                match weight_mutator_method:
+                                                "normal":
+                                                                if weight_mutation_mode == "all":
+                                                                                wm = WeightMutator.Normal.new(0.0, weight_mutation_normal_std * weight_mutation_all_scale)
+                                                                else:
+                                                                                wm = WeightMutator.Normal.new(0.0, weight_mutation_normal_std)
+                                                _:
+                                                                if weight_mutation_mode == "all":
+                                                                                wm = WeightMutator.Standard.new(weight_mutation_delta_min * weight_mutation_all_scale, weight_mutation_delta_max * weight_mutation_all_scale)
+                                                                else:
+                                                                                wm = WeightMutator.Standard.new(weight_mutation_delta_min, weight_mutation_delta_max)
+                                # In "all" mode, override the selector to return ALL enabled connections.
+                                if weight_mutation_mode == "all":
+                                                ws = WeightSelector.All.new()
+                                pol.weight_selector = ws
+                                pol.weight_mutator = wm
+                # Connection selector/mutator
+                if enable_connection_mutation:
+                                var cs: ConnectionSelector
+                                match connection_selector_method:
+                                                "least_used":
+                                                                cs = ConnectionSelector.LeastUsed.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
+                                                "least_common":
+                                                                cs = ConnectionSelector.LeastCommon.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
+                                                _:
+                                                                cs = ConnectionSelector.Standard.new(connection_mutation_min, connection_mutation_rate, forbid_loops)
+                                var cm: ConnectionMutator
+                                match connection_mutator_method:
+                                                "normal":
+                                                                cm = ConnectionMutator.Normal.new(0.0, connection_weight_normal_std)
+                                                "safe_gradient":
+                                                                cm = ConnectionMutator.SafeGradient.new()
+                                                _:
+                                                                cm = ConnectionMutator.Standard.new(connection_weight_min, connection_weight_max)
+                                pol.connection_selector = cs
+                                pol.connection_mutator = cm
+                # Neuron selector/mutator
+                if enable_neuron_mutation:
+                                var ns: NeuronSelector
+                                match neuron_selector_method:
+                                                "least_common":
+                                                                ns = NeuronSelector.LeastCommon.new(neuron_mutation_min, neuron_mutation_rate)
+                                                _:
+                                                                ns = NeuronSelector.Standard.new(neuron_mutation_min, neuron_mutation_rate)
+                                var nm := NeuronMutator.Standard.new(hidden_activation)
+                                pol.neuron_selector = ns
+                                pol.neuron_mutator = nm
+                # Prune selector/mutator
+                if enable_prune_mutation:
+                                var ps: PruneSelector
+                                match prune_selector_method:
+                                                "least_weight":
+                                                                ps = PruneSelector.LeastWeight.new(prune_mutation_min, prune_mutation_rate)
+                                                _:
+                                                                ps = PruneSelector.Standard.new(prune_mutation_min, prune_mutation_rate)
+                                var pm: PruneMutator
+                                match prune_mutator_method:
+                                                "non_essential":
+                                                                pm = PruneMutator.PruneNonEssential.new()
+                                                "merge":
+                                                                pm = PruneMutator.MergePair.new()
+                                                _:
+                                                                pm = PruneMutator.PruneDisabled.new()
+                                pol.prune_selector = ps
+                                pol.prune_mutator = pm
+                # Enable selector
+                if enable_enable_mutation:
+                                pol.enable_selector = EnableSelector.Standard.new(enable_mutation_min, enable_mutation_rate)
+                return pol
 
 func _build_neuron_crossover() -> NeuronCrossover:
-		match neuron_crossover_method:
-				"standard_all":
-						return NeuronCrossover.StandardAll.new()
-				"average":
-						return NeuronCrossover.Average.new()
-				"biased_average":
-						return NeuronCrossover.BiasedAverage.new(biased_average_strength)
-				_:
-						return NeuronCrossover.Standard.new()
+                match neuron_crossover_method:
+                                "standard_all":
+                                                return NeuronCrossover.StandardAll.new()
+                                "average":
+                                                return NeuronCrossover.Average.new()
+                                "biased_average":
+                                                return NeuronCrossover.BiasedAverage.new(biased_average_strength)
+                                _:
+                                                return NeuronCrossover.Standard.new()
 
 func _build_overall_crossover(nc: NeuronCrossover) -> OverallCrossover:
-		match overall_crossover_method:
-				"bigger":
-						return OverallCrossover.Bigger.new(nc)
-				"combine":
-						return OverallCrossover.Combine.new(nc)
-				"excluded":
-						return OverallCrossover.Excluded.new(nc)
-				_:
-						return OverallCrossover.Fitter.new(nc)
+                match overall_crossover_method:
+                                "bigger":
+                                                return OverallCrossover.Bigger.new(nc)
+                                "combine":
+                                                return OverallCrossover.Combine.new(nc)
+                                "excluded":
+                                                return OverallCrossover.Excluded.new(nc)
+                                _:
+                                                return OverallCrossover.Fitter.new(nc)

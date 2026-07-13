@@ -431,7 +431,7 @@ func _make_config(env_idx: int) -> NeatConfig:
         c.max_species_count = 20
         c.merge_ratio = 0.5
         c.min_threshold = 0.5
-        c.max_threshold = 15.0
+        c.max_threshold = 30.0
         c.generation_method = "mixed"
         c.crossover_rate = 0.75
         c.elite_count = 1

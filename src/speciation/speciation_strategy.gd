@@ -378,6 +378,9 @@ class Purge:
 										if dd < min_dist:
 												min_dist = dd
 						ideal_threshold = min_dist
+				# Clamp to the Standard delegate's bounds so the
+				# threshold is always within a sane range.
+				ideal_threshold = clampf(ideal_threshold, standard.min_threshold, standard.max_threshold)
 				standard.compatibility_threshold = ideal_threshold
 				# Build species: assign each genome to its seed species (already set
 				# via parent_species_id during fill).
